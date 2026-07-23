@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface PaymentTypeSelectorProps {
   value: "cash" | "part" | "debt" | null;
@@ -89,7 +90,7 @@ export default function PaymentTypeSelector({
       {value === "part" && onPartValueChange && (
         <div className="col-span-3 mt-2">
           <label className="text-sm font-medium">قيمة الدفعة</label>
-          <input
+          <Input
             type="number"
             value={partValue}
             onChange={(e) => onPartValueChange(Number(e.target.value))}

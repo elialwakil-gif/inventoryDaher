@@ -99,7 +99,7 @@ const CustomerDiscountForm = ({
             type="number"
             step={0.01}
             placeholder="أدخل قيمة الحسم"
-            {...register("discountValue", { valueAsNumber: true })}
+            {...register("discountValue")}
           />
 
           {errors.discountValue && (

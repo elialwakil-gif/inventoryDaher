@@ -7,6 +7,8 @@ export interface InventoryUserRecord {
   username: string;
   role: string;
   permissions?: AppPermission[] | string[];
+  vehicleId?: string;
+  vehicleName?: string;
   createdAt?: string;
   updatedAt?: string;
 }

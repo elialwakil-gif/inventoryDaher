@@ -29,6 +29,8 @@ export type AppPermission =
   | "inventory-balances"
   | "purchases"
   | "sell-product"
+  | "vehicles"
+  | "driver-sales"
   | "quotations"
   | "material-reservations"
   | "suppliers"
@@ -104,6 +106,20 @@ export const navigationGroups: NavigationItem[] = [
     icon: ShoppingCart,
     allowed: ["admin"],
     permission: "sell-product",
+  },
+  {
+    name: "Vehicles",
+    href: "/vehicles",
+    icon: Truck,
+    allowed: ["admin"],
+    permission: "vehicles",
+  },
+  {
+    name: "Driver Sales",
+    href: "/driver-sales",
+    icon: ShoppingCart,
+    allowed: ["admin", "driver"],
+    permission: "driver-sales",
   },
   {
     name: "Quotations",

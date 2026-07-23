@@ -32,6 +32,11 @@ export interface sell {
   amount_base: number;
   partValue: number;
   discount?: number;
+  vehicleId?: string;
+  vehicleName?: string;
+  driverId?: string;
+  driverName?: string;
+  sourceWarehouse?: string;
 }
 
 export interface returnData {

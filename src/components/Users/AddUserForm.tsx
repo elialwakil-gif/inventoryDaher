@@ -38,6 +38,7 @@ const defaultUserPermissions: AppPermission[] = [
   "dashboard",
   "products",
 ];
+const defaultDriverPermissions: AppPermission[] = ["driver-sales"];
 
 const normalizeFormPermissions = (user?: InventoryUserRecord | null) => {
   const permissions = getUserPermissions(user || null);
@@ -128,6 +129,11 @@ export default function AddUserForm({
 
     if (nextRole === "admin") {
       setPermissions(allPagePermissions);
+      return;
+    }
+
+    if (nextRole === "driver") {
+      setPermissions(defaultDriverPermissions);
       return;
     }
 
@@ -241,6 +247,7 @@ export default function AddUserForm({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="user">User</SelectItem>
+              <SelectItem value="driver">Driver</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>

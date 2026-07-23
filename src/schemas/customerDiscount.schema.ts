@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const discountSchema = z.object({
   discountValue: z
-    .number({
+    .coerce.number({
       required_error: "قيمة الحسم مطلوبة",
       invalid_type_error: "يجب إدخال رقم صحيح",
     })
