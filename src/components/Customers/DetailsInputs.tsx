@@ -106,6 +106,8 @@ export default function DetailsInputs({
 
   const convertLabel = (key: string) => {
     const labels: Record<string, string> = {
+      balanceUSD: "الرصيد USD",
+      balanceSYP: "الرصيد SYP",
       name: "الاسم",
       balance: "الرصيد",
       createdAt: "تاريخ الإنشاء",
@@ -190,7 +192,12 @@ export default function DetailsInputs({
           <div key={key} className="flex gap-2 mb-4 items-end group relative">
             <label className="font-bold w-36">{convertLabel(key)}:</label>
             <input
-              readOnly={key === "id" || key === "balance"}
+              readOnly={
+                key === "id" ||
+                key === "balance" ||
+                key === "balanceUSD" ||
+                key === "balanceSYP"
+              }
               disabled={key === "address"}
               value={value ?? ""}
               onChange={(e) => handleChange(key, e.target.value)}

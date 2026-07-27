@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DataTable } from "../dashboard/DataTable";
 import { Button } from "../ui/button";
 import { Product } from "@/services/transaction";
@@ -19,6 +19,13 @@ type productDataTableProp = {
 const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTransfare, setProductRow, isLoading }: productDataTableProp) => {
   const navigate = useNavigate();
   const [openBulkPriceIncrease, setOpenBulkPriceIncrease] = useState(false);
+  const isAdmin = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("InventoryUser") || "null")?.role === "admin";
+    } catch {
+      return false;
+    }
+  }, []);
   const ProductsColumns = [
     { key: "id", label: "المعرف", sortable: true, hidden: true },
     { key: "code", label: "الرمز", sortable: true },
@@ -29,7 +36,9 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
     { key: "alertQuantity", label: "حد التنبيه", sortable: true },
     { key: "warehouse", label: "المخزن", sortable: true },
     { key: "payPrice", label: "سعر الشراء", sortable: true, onlyAdmin: true },
-    { key: "sellPrice", label: "سعر المبيع", sortable: true },
+    { key: "wholesalePrice", label: "سعر الجملة", sortable: true, onlyAdmin: true },
+    { key: "superWholesalePrice", label: "سعر جملة الجملة", sortable: true, onlyAdmin: true },
+    { key: "sellPrice", label: "سعر المبيع", sortable: true, onlyAdmin: true },
     { key: "category", label: "الصنف", sortable: true },
     { key: "unit", label: "الواحدة", sortable: true },
   ];
@@ -50,6 +59,8 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
           >
             إضافة منتج
           </Button>
+          {isAdmin && (
+            <>
           <Button
             variant="outline"
             onClick={() => setOpenBulkPriceIncrease(true)}
@@ -61,6 +72,8 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
             setIsOpen={setOpenBulkPriceIncrease}
             productsData={productsData}
           />
+            </>
+          )}
           </div>
           
         }

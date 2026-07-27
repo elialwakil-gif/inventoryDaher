@@ -14,15 +14,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  buildInvoiceMoney,
+  formatExchangeRate,
+  formatMoney as formatCurrencyAmount,
+} from "@/lib/money";
 import getAllCustomer from "@/services/customer";
-import type { Product, sell } from "@/services/transaction";
-import { createMyVehicleSale, getMyVehicle } from "@/services/vehicles";
+import type { Product, ProductPriceType, sell } from "@/services/transaction";
+import {
+  createMyVehicleSale,
+  getMyVehicle,
+  type VehicleServiceError,
+} from "@/services/vehicles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, Truck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-type SelectedProduct = Product & { qty: number };
+type SelectedProduct = Product & { qty: number; selectedPriceType?: ProductPriceType };
 type PaymentStatus = "cash" | "part" | "debt";
 
 const toNumber = (value: unknown) => {
@@ -39,12 +48,21 @@ const formatMoney = (value: unknown) =>
     minimumFractionDigits: 0,
   });
 
+const shouldRetryVehicleQuery = (
+  failureCount: number,
+  queryError: Error,
+) => {
+  const status = (queryError as VehicleServiceError).status;
+  return status !== 401 && status !== 404 && failureCount < 2;
+};
+
 export default function DriverSales() {
   const queryClient = useQueryClient();
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [discount, setDiscount] = useState("");
+  const [discountPercent, setDiscountPercent] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("cash");
   const [currency, setCurrency] = useState("USD");
   const [exchangeRate, setExchangeRate] = useState(1);
@@ -61,6 +79,7 @@ export default function DriverSales() {
   } = useQuery({
     queryKey: ["driver-vehicle"],
     queryFn: () => getMyVehicle(),
+    retry: shouldRetryVehicleQuery,
   });
 
   const { data: customers = [] } = useQuery({
@@ -92,15 +111,34 @@ export default function DriverSales() {
     [selectedProducts],
   );
 
-  const totalPrice = useMemo(
-    () => Math.max(Number((subtotal - toNumber(discount)).toFixed(3)), 0),
-    [discount, subtotal],
+  const saleMoney = useMemo(
+    () =>
+      buildInvoiceMoney({
+        subtotalUSD: subtotal,
+        paymentStatus,
+        currency,
+        exchangeRate,
+        partValue,
+        discountAmountUSD: toNumber(discount),
+        discountPercent: toNumber(discountPercent),
+      }),
+    [
+      currency,
+      discount,
+      discountPercent,
+      exchangeRate,
+      partValue,
+      paymentStatus,
+      subtotal,
+    ],
   );
+  const totalPrice = saleMoney.totalUSD;
 
   const resetInvoice = () => {
     setCustomerId("");
     setSelectedProducts([]);
     setDiscount("");
+    setDiscountPercent("");
     setPaymentStatus("cash");
     setCurrency("USD");
     setExchangeRate(1);
@@ -147,6 +185,21 @@ export default function DriverSales() {
       return false;
     }
 
+    if (toNumber(discountPercent) < 0 || toNumber(discountPercent) > 100) {
+      toast.error("نسبة الحسم يجب أن تكون بين 0 و 100");
+      return false;
+    }
+
+    if (toNumber(discount) < 0) {
+      toast.error("مبلغ الحسم لا يمكن أن يكون سالبا");
+      return false;
+    }
+
+    if (saleMoney.discountUSD >= subtotal) {
+      toast.error("الحسم يجب أن يكون أقل من مجموع الفاتورة");
+      return false;
+    }
+
     if (!salesAccountId) {
       toast.error("اختر حساب المبيعات");
       return false;
@@ -170,14 +223,10 @@ export default function DriverSales() {
       return false;
     }
 
-    const paidAmount =
-      paymentStatus === "part"
-        ? currency === "USD"
-          ? toNumber(partValue)
-          : toNumber(partValue) / toNumber(exchangeRate)
-        : totalPrice;
-
-    if (paymentStatus === "part" && (paidAmount <= 0 || paidAmount >= totalPrice)) {
+    if (
+      paymentStatus === "part" &&
+      (saleMoney.paidUSD <= 0 || saleMoney.paidUSD >= totalPrice)
+    ) {
       toast.error("الدفعة الجزئية يجب أن تكون أكبر من صفر وأقل من الإجمالي");
       return false;
     }
@@ -187,16 +236,6 @@ export default function DriverSales() {
 
   const submitSale = () => {
     if (!validateSale()) return;
-
-    const saleExchangeRate = currency === "USD" ? 1 : toNumber(exchangeRate);
-    const paidAmount =
-      paymentStatus === "cash"
-        ? totalPrice
-        : paymentStatus === "part"
-        ? currency === "USD"
-          ? toNumber(partValue)
-          : Number((toNumber(partValue) / saleExchangeRate).toFixed(3))
-        : 0;
 
     const newSell: sell = {
       customerId,
@@ -210,16 +249,35 @@ export default function DriverSales() {
       })),
       totalPrice,
       paymentStatus,
-      remainingDebt: paymentStatus === "cash" ? 0 : totalPrice - paidAmount,
+      remainingDebt: saleMoney.remainingUSD,
       paymentAccountId: paymentStatus === "debt" ? undefined : paymentAccountId,
       receivableAccountId:
         paymentStatus === "cash" ? undefined : receivableAccountId,
       salesAccountId,
-      currency,
-      exchangeRate: saleExchangeRate,
-      amount_base: totalPrice * saleExchangeRate,
-      partValue: toNumber(partValue),
-      discount: toNumber(discount),
+      currency: saleMoney.paymentCurrency,
+      paymentCurrency: saleMoney.paymentCurrency,
+      priceCurrency: saleMoney.priceCurrency,
+      exchangeRate: saleMoney.exchangeRate,
+      amount_base: saleMoney.totalOriginal,
+      subtotalUSD: saleMoney.subtotalUSD,
+      totalUSD: saleMoney.totalUSD,
+      totalSYP: saleMoney.totalSYP,
+      totalOriginal: saleMoney.totalOriginal,
+      paidUSD: saleMoney.paidUSD,
+      paidSYP: saleMoney.paidSYP,
+      paidOriginal: saleMoney.paidOriginal,
+      remainingUSD: saleMoney.remainingUSD,
+      remainingSYP: saleMoney.remainingSYP,
+      remainingOriginal: saleMoney.remainingOriginal,
+      discountType: saleMoney.discountType,
+      discountPercent: saleMoney.discountPercent,
+      discountPercentUSD: saleMoney.discountPercentUSD,
+      discountAmountUSD: saleMoney.discountAmountUSD,
+      discountUSD: saleMoney.discountUSD,
+      discountSYP: saleMoney.discountSYP,
+      discountOriginal: saleMoney.discountOriginal,
+      partValue: saleMoney.paidOriginal,
+      discount: saleMoney.discountUSD,
       vehicleId: vehicle?.id,
       vehicleName: vehicle?.name,
       sourceWarehouse: vehicle?.name,
@@ -324,7 +382,15 @@ export default function DriverSales() {
 
                 <form className="grid grid-cols-1 gap-3 lg:col-span-3 md:grid-cols-2">
                   <FormInput
-                    label="الحسم"
+                    label="حسم نسبة %"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={discountPercent}
+                    onChange={(event) => setDiscountPercent(event.target.value)}
+                  />
+                  <FormInput
+                    label="حسم مبلغ"
                     type="number"
                     min={0}
                     value={discount}
@@ -364,7 +430,7 @@ export default function DriverSales() {
                     />
                   )}
 
-                  {paymentStatus !== "debt" && (
+                  <>
                     <>
                       <div>
                         <label className="mb-1 block text-sm font-medium">
@@ -396,7 +462,27 @@ export default function DriverSales() {
                         }
                       />
                     </>
-                  )}
+                  </>
+
+                  <div className="rounded-md border bg-muted/30 p-3 text-sm md:col-span-2">
+                    <div className="grid gap-1 sm:grid-cols-3">
+                      <span>الإجمالي: {formatCurrencyAmount(saleMoney.totalUSD, "USD")}</span>
+                      <span>المدفوع: {formatCurrencyAmount(saleMoney.paidUSD, "USD")}</span>
+                      <span>المتبقي: {formatCurrencyAmount(saleMoney.remainingUSD, "USD")}</span>
+                    </div>
+                    {saleMoney.paymentCurrency === "SYP" && (
+                      <div className="mt-1 grid gap-1 sm:grid-cols-3">
+                        <span>الإجمالي: {formatCurrencyAmount(saleMoney.totalSYP, "SYP")}</span>
+                        <span>المدفوع: {formatCurrencyAmount(saleMoney.paidSYP, "SYP")}</span>
+                        <span>المتبقي: {formatCurrencyAmount(saleMoney.remainingSYP, "SYP")}</span>
+                      </div>
+                    )}
+                    {saleMoney.paymentCurrency === "SYP" && (
+                      <div className="mt-1 text-muted-foreground">
+                        سعر الصرف المعتمد: {formatExchangeRate(saleMoney.exchangeRate)}
+                      </div>
+                    )}
+                  </div>
 
                   <AccountSelect
                     label="حساب المبيعات"

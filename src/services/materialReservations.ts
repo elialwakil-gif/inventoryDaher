@@ -11,6 +11,8 @@ export interface MaterialReservationItem {
   warehouse: string;
   unit?: string;
   payPrice?: number;
+  wholesalePrice?: number;
+  superWholesalePrice?: number;
   sellPrice: number;
   reservedQty: number;
   usedQty?: number;
@@ -33,6 +35,9 @@ export interface MaterialReservation {
   totalReturnedQty?: number;
   totalPrice?: number;
   discount?: number;
+  discountPercent?: number;
+  discountPercentUSD?: number;
+  discountAmountUSD?: number;
   createdAt: string;
   updatedAt: string;
   closedAt?: string;
@@ -61,6 +66,9 @@ export interface CloseMaterialReservationPayload {
   sell: {
     paymentStatus: "cash" | "part" | "debt";
     discount?: number;
+    discountPercent?: number;
+    discountPercentUSD?: number;
+    discountAmountUSD?: number;
     currency: string;
     exchangeRate: number;
     partValue?: number;

@@ -61,8 +61,36 @@ const normalizeVehicleSummaries = (data: any): VehicleSummary[] => {
 const extractVehicleSummary = (data: any): VehicleSummary | null =>
   data?.data || data?.vehicle || data || null;
 
-const getErrorMessage = (error: any, fallback: string) =>
-  error?.response?.data?.message || error?.message || fallback;
+export type VehicleServiceError = Error & {
+  status?: number;
+  serverMessage?: string;
+};
+
+const getErrorMessage = (error: any, fallback: string) => {
+  const status = error?.response?.status;
+  const serverMessage = error?.response?.data?.message;
+
+  if (status === 401) {
+    return "انتهت جلسة الدخول أو لا توجد صلاحية. سجّل الدخول مرة أخرى.";
+  }
+
+  if (status === 404 && serverMessage === "No vehicle assigned to this driver") {
+    return "لم يتم ربط هذا المستخدم بسيارة. اربط السائق بسيارة من صفحة السيارات ثم أعد تسجيل الدخول.";
+  }
+
+  if (status === 404 && String(serverMessage || "").includes("Route not found")) {
+    return "مسار السيارات غير موجود على السيرفر المنشور. تأكد من نشر آخر نسخة من الـ backend.";
+  }
+
+  return serverMessage || error?.message || fallback;
+};
+
+const createServiceError = (error: any, fallback: string): VehicleServiceError => {
+  const nextError = new Error(getErrorMessage(error, fallback)) as VehicleServiceError;
+  nextError.status = error?.response?.status;
+  nextError.serverMessage = error?.response?.data?.message;
+  return nextError;
+};
 
 export async function getAllVehicles(date?: string) {
   try {
@@ -71,7 +99,7 @@ export async function getAllVehicles(date?: string) {
     });
     return normalizeVehicleSummaries(response.data);
   } catch (error: any) {
-    throw new Error(getErrorMessage(error, "Failed to fetch vehicles"));
+    throw createServiceError(error, "Failed to fetch vehicles");
   }
 }
 
@@ -82,7 +110,7 @@ export async function getMyVehicle(date?: string) {
     });
     return extractVehicleSummary(response.data);
   } catch (error: any) {
-    throw new Error(getErrorMessage(error, "Failed to fetch driver vehicle"));
+    throw createServiceError(error, "Failed to fetch driver vehicle");
   }
 }
 
@@ -91,7 +119,7 @@ export async function createVehicle(payload: CreateVehiclePayload) {
     const response = await apiClient.post("/api/vehicles", payload);
     return response.data;
   } catch (error: any) {
-    throw new Error(getErrorMessage(error, "Failed to create vehicle"));
+    throw createServiceError(error, "Failed to create vehicle");
   }
 }
 
@@ -100,7 +128,7 @@ export async function updateVehicle(id: string, payload: UpdateVehiclePayload) {
     const response = await apiClient.put(`/api/vehicles/${id}`, payload);
     return response.data;
   } catch (error: any) {
-    throw new Error(getErrorMessage(error, "Failed to update vehicle"));
+    throw createServiceError(error, "Failed to update vehicle");
   }
 }
 
@@ -109,7 +137,7 @@ export async function loadVehicle(id: string, payload: LoadVehiclePayload) {
     const response = await apiClient.post(`/api/vehicles/${id}/load`, payload);
     return response.data;
   } catch (error: any) {
-    throw new Error(getErrorMessage(error, "Failed to load vehicle"));
+    throw createServiceError(error, "Failed to load vehicle");
   }
 }
 
@@ -118,6 +146,6 @@ export async function createMyVehicleSale(newSell: sell) {
     const response = await apiClient.post("/api/vehicles/me/sell", { newSell });
     return response.data;
   } catch (error: any) {
-    throw new Error(getErrorMessage(error, "Failed to create vehicle sale"));
+    throw createServiceError(error, "Failed to create vehicle sale");
   }
 }

@@ -1,5 +1,5 @@
 import apiClient from "@/lib/axios";
-import type { Product } from "@/services/transaction";
+import type { Product, ProductPriceType } from "@/services/transaction";
 
 export type QuotationStatus =
   | "draft"
@@ -11,6 +11,7 @@ export type QuotationStatus =
 export type QuotationProduct = Product & {
   productId?: string;
   qty: number;
+  selectedPriceType?: ProductPriceType;
 };
 
 export interface Quotation {
@@ -22,6 +23,10 @@ export interface Quotation {
   products: QuotationProduct[];
   subtotal: number;
   discount: number;
+  discountType?: "none" | "amount" | "percent" | "mixed";
+  discountPercent?: number;
+  discountPercentUSD?: number;
+  discountAmountUSD?: number;
   totalPrice: number;
   currency: string;
   exchangeRate: number;

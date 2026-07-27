@@ -57,9 +57,14 @@ interface SellRecord {
     name?: string;
   };
   totalPrice?: number | string;
+  totalUSD?: number | string;
+  totalSYP?: number | string;
   amount_base?: number | string;
   paymentStatus?: string;
   currency?: string;
+  priceCurrency?: string;
+  paymentCurrency?: string;
+  exchangeRate?: number | string;
   date?: string;
   createdAt?: string;
   products?: SellProduct[];
@@ -86,6 +91,10 @@ interface ProfitLine {
   revenue: number;
   cost: number;
   profit: number;
+  revenueSYP: number;
+  costSYP: number;
+  profitSYP: number;
+  exchangeDifference: number;
   currency: string;
 }
 
@@ -103,6 +112,8 @@ const productColumns = [
   { key: "revenue", label: "إجمالي البيع", sortable: true },
   { key: "cost", label: "إجمالي التكلفة", sortable: true },
   { key: "profit", label: "الربح", sortable: true },
+  { key: "profitSYP", label: "الربح SYP", sortable: true },
+  { key: "exchangeDifference", label: "فرق الصرف", sortable: true },
   { key: "profitMargin", label: "نسبة الربح", sortable: true },
 ];
 
@@ -115,6 +126,8 @@ const invoiceColumns = [
   { key: "revenue", label: "قيمة البيع", sortable: true },
   { key: "cost", label: "التكلفة", sortable: true },
   { key: "profit", label: "الربح", sortable: true },
+  { key: "profitSYP", label: "الربح SYP", sortable: true },
+  { key: "exchangeDifference", label: "فرق الصرف", sortable: true },
   { key: "profitMargin", label: "نسبة الربح", sortable: true },
 ];
 
@@ -126,6 +139,8 @@ const customerColumns = [
   { key: "revenue", label: "إجمالي المبيعات", sortable: true },
   { key: "cost", label: "إجمالي التكلفة", sortable: true },
   { key: "profit", label: "إجمالي الربح", sortable: true },
+  { key: "profitSYP", label: "إجمالي الربح SYP", sortable: true },
+  { key: "exchangeDifference", label: "فرق الصرف", sortable: true },
   { key: "averageProfit", label: "متوسط ربح الفاتورة", sortable: true },
   { key: "profitMargin", label: "نسبة الربح", sortable: true },
 ];
@@ -138,6 +153,8 @@ const warehouseColumns = [
   { key: "revenue", label: "إجمالي البيع", sortable: true },
   { key: "cost", label: "إجمالي التكلفة", sortable: true },
   { key: "profit", label: "الربح", sortable: true },
+  { key: "profitSYP", label: "الربح SYP", sortable: true },
+  { key: "exchangeDifference", label: "فرق الصرف", sortable: true },
   { key: "profitMargin", label: "نسبة الربح", sortable: true },
 ];
 
@@ -270,7 +287,11 @@ export default function ProfitAnalysis() {
   const currencies = useMemo(
     () =>
       Array.from(
-        new Set((data?.sells || []).map((sell) => normalizeCurrency(sell.currency))),
+        new Set(
+          (data?.sells || []).map((sell) =>
+            normalizeCurrency(sell.priceCurrency || "USD"),
+          ),
+        ),
       ),
     [data?.sells],
   );
@@ -278,14 +299,17 @@ export default function ProfitAnalysis() {
   const profitLines = useMemo<ProfitLine[]>(() => {
     return (data?.sells || []).flatMap((sell) => {
       const products = Array.isArray(sell.products) ? sell.products : [];
-      const invoiceTotal = toNumber(sell.totalPrice);
+      const invoiceTotal = toNumber(sell.totalUSD ?? sell.totalPrice);
       const grossProductsTotal = products.reduce((sum, product) => {
         const quantity = getProductQuantity(product);
         return sum + quantity * toNumber(product.sellPrice);
       }, 0);
       const date = sell.date || sell.createdAt || "";
       const customerName = getCustomerName(sell, customersMap);
-      const currency = normalizeCurrency(sell.currency);
+      const currency = normalizeCurrency(sell.priceCurrency || "USD");
+      const paymentCurrency = normalizeCurrency(sell.paymentCurrency || sell.currency);
+      const exchangeRate = paymentCurrency === "SYP" ? toNumber(sell.exchangeRate) || 1 : 1;
+      const invoiceTotalSYP = toNumber(sell.totalSYP);
 
       return products.map((product, index) => {
         const quantity = getProductQuantity(product);
@@ -296,6 +320,20 @@ export default function ProfitAnalysis() {
             : listRevenue || toNumber(product.totalPrice);
         const cost = quantity * toNumber(product.payPrice);
         const profit = revenue - cost;
+        const revenueShare =
+          invoiceTotal > 0 && revenue > 0 ? revenue / invoiceTotal : 0;
+        const revenueSYP =
+          paymentCurrency === "SYP"
+            ? invoiceTotalSYP > 0
+              ? invoiceTotalSYP * revenueShare
+              : revenue * exchangeRate
+            : 0;
+        const costSYP = paymentCurrency === "SYP" ? cost * exchangeRate : 0;
+        const profitSYP = revenueSYP - costSYP;
+        const exchangeDifference =
+          paymentCurrency === "SYP" && exchangeRate > 0
+            ? revenueSYP / exchangeRate - revenue
+            : 0;
 
         return {
           id: `${sell.id || "invoice"}-${product.productId || product.id || index}`,
@@ -313,6 +351,10 @@ export default function ProfitAnalysis() {
           revenue,
           cost,
           profit,
+          revenueSYP,
+          costSYP,
+          profitSYP,
+          exchangeDifference,
           currency,
         };
       });
@@ -346,6 +388,11 @@ export default function ProfitAnalysis() {
     const revenue = filteredLines.reduce((sum, line) => sum + line.revenue, 0);
     const cost = filteredLines.reduce((sum, line) => sum + line.cost, 0);
     const profit = revenue - cost;
+    const profitSYP = filteredLines.reduce((sum, line) => sum + line.profitSYP, 0);
+    const exchangeDifference = filteredLines.reduce(
+      (sum, line) => sum + line.exchangeDifference,
+      0,
+    );
 
     return {
       invoiceCount: invoiceIds.size,
@@ -356,6 +403,8 @@ export default function ProfitAnalysis() {
       revenue,
       cost,
       profit,
+      profitSYP,
+      exchangeDifference,
       profitMargin: getProfitMargin(profit, revenue),
     };
   }, [filteredLines]);
@@ -374,12 +423,16 @@ export default function ProfitAnalysis() {
         revenue: 0,
         cost: 0,
         profit: 0,
+        profitSYP: 0,
+        exchangeDifference: 0,
       };
 
       previous.quantity += line.quantity;
       previous.revenue += line.revenue;
       previous.cost += line.cost;
       previous.profit += line.profit;
+      previous.profitSYP += line.profitSYP;
+      previous.exchangeDifference += line.exchangeDifference;
       rows.set(key, previous);
     });
 
@@ -390,6 +443,8 @@ export default function ProfitAnalysis() {
         revenue: round2(row.revenue),
         cost: round2(row.cost),
         profit: round2(row.profit),
+        profitSYP: round2(row.profitSYP),
+        exchangeDifference: round2(row.exchangeDifference),
         profitMargin: formatPercent(getProfitMargin(row.profit, row.revenue)),
       }))
       .sort((a, b) => b.profit - a.profit);
@@ -409,6 +464,8 @@ export default function ProfitAnalysis() {
         revenue: 0,
         cost: 0,
         profit: 0,
+        profitSYP: 0,
+        exchangeDifference: 0,
         sortTime: line.sortTime,
       };
 
@@ -418,6 +475,8 @@ export default function ProfitAnalysis() {
       previous.revenue += line.revenue;
       previous.cost += line.cost;
       previous.profit += line.profit;
+      previous.profitSYP += line.profitSYP;
+      previous.exchangeDifference += line.exchangeDifference;
       previous.sortTime = Math.max(previous.sortTime, line.sortTime);
       rows.set(line.invoiceId, previous);
     });
@@ -432,6 +491,8 @@ export default function ProfitAnalysis() {
         revenue: round2(row.revenue),
         cost: round2(row.cost),
         profit: round2(row.profit),
+        profitSYP: round2(row.profitSYP),
+        exchangeDifference: round2(row.exchangeDifference),
         profitMargin: formatPercent(getProfitMargin(row.profit, row.revenue)),
         sortTime: row.sortTime,
       }))
@@ -451,6 +512,8 @@ export default function ProfitAnalysis() {
         revenue: 0,
         cost: 0,
         profit: 0,
+        profitSYP: 0,
+        exchangeDifference: 0,
       };
 
       previous.invoiceIds.add(line.invoiceId);
@@ -459,6 +522,8 @@ export default function ProfitAnalysis() {
       previous.revenue += line.revenue;
       previous.cost += line.cost;
       previous.profit += line.profit;
+      previous.profitSYP += line.profitSYP;
+      previous.exchangeDifference += line.exchangeDifference;
       rows.set(line.customerId, previous);
     });
 
@@ -471,6 +536,8 @@ export default function ProfitAnalysis() {
         revenue: round2(row.revenue),
         cost: round2(row.cost),
         profit: round2(row.profit),
+        profitSYP: round2(row.profitSYP),
+        exchangeDifference: round2(row.exchangeDifference),
         averageProfit: round2(row.invoicesCount ? row.profit / row.invoicesCount : 0),
         profitMargin: formatPercent(getProfitMargin(row.profit, row.revenue)),
       }))
@@ -490,6 +557,8 @@ export default function ProfitAnalysis() {
         revenue: 0,
         cost: 0,
         profit: 0,
+        profitSYP: 0,
+        exchangeDifference: 0,
       };
 
       previous.invoiceIds.add(line.invoiceId);
@@ -498,6 +567,8 @@ export default function ProfitAnalysis() {
       previous.revenue += line.revenue;
       previous.cost += line.cost;
       previous.profit += line.profit;
+      previous.profitSYP += line.profitSYP;
+      previous.exchangeDifference += line.exchangeDifference;
       rows.set(line.warehouse, previous);
     });
 
@@ -510,6 +581,8 @@ export default function ProfitAnalysis() {
         revenue: round2(row.revenue),
         cost: round2(row.cost),
         profit: round2(row.profit),
+        profitSYP: round2(row.profitSYP),
+        exchangeDifference: round2(row.exchangeDifference),
         profitMargin: formatPercent(getProfitMargin(row.profit, row.revenue)),
       }))
       .sort((a, b) => b.profit - a.profit);
@@ -520,6 +593,8 @@ export default function ProfitAnalysis() {
       { metric: "إجمالي المبيعات", value: formatAmount(totals.revenue) },
       { metric: "تكلفة البضاعة المباعة", value: formatAmount(totals.cost) },
       { metric: "مجمل الربح", value: formatAmount(totals.profit) },
+      { metric: "مجمل الربح SYP", value: formatAmount(totals.profitSYP) },
+      { metric: "فرق سعر الصرف", value: formatAmount(totals.exchangeDifference) },
       { metric: "نسبة الربح", value: formatPercent(totals.profitMargin) },
       { metric: "عدد الفواتير", value: totals.invoiceCount },
       { metric: "عدد المنتجات", value: totals.productCount },
@@ -615,6 +690,16 @@ export default function ProfitAnalysis() {
                 title="مجمل الربح"
                 value={formatAmount(totals.profit)}
                 icon={TrendingUp}
+              />
+              <StatsCard
+                title="مجمل الربح SYP"
+                value={formatAmount(totals.profitSYP)}
+                icon={TrendingUp}
+              />
+              <StatsCard
+                title="فرق سعر الصرف"
+                value={formatAmount(totals.exchangeDifference)}
+                icon={FileText}
               />
               <StatsCard
                 title="نسبة الربح"

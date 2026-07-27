@@ -103,8 +103,15 @@ export default function AddBalanceForm({
                 currency === "USD"
                   ? amount
                   : Number((amount / exchangeRate).toFixed(1)),
+              amountUSD:
+                currency === "USD"
+                  ? amount
+                  : Number((amount / exchangeRate).toFixed(1)),
+              amountSYP: currency === "SYP" ? amount : 0,
+              amountOriginal: amount,
               note,
               currency,
+              paymentCurrency: currency as "USD" | "SYP",
               exchangeRate,
               amount_base: amount,
               type: "income",

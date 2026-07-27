@@ -1,9 +1,10 @@
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { Quotation } from "@/services/quotations";
+import { formatExchangeRate, shouldShowExchangeRate } from "@/lib/money";
 
-const toNumber = (value: unknown) => {
+const toNumber = (value: unknown, fallback = 0) => {
   const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? numberValue : 0;
+  return Number.isFinite(numberValue) ? numberValue : fallback;
 };
 
 const formatAmount = (value: unknown) => toNumber(value).toFixed(2);
@@ -16,16 +17,29 @@ export default function QuotationPdf({
   const products = Array.isArray(quotation.products)
     ? quotation.products
     : [];
-  const subtotal = products.reduce(
+  const productsSubtotal = products.reduce(
     (sum, product) =>
       sum + toNumber(product?.qty) * toNumber(product?.sellPrice),
     0,
   );
+  const subtotal = toNumber(quotation.subtotal, productsSubtotal) || productsSubtotal;
   const discount = toNumber(quotation.discount);
+  const discountPercent = toNumber(quotation.discountPercent);
+  const discountAmountUSD = toNumber(quotation.discountAmountUSD);
+  const discountDetails = [
+    discountPercent > 0 ? `${discountPercent.toFixed(2)}%` : "",
+    discountAmountUSD > 0 ? `${discountAmountUSD.toFixed(2)}` : "",
+  ]
+    .filter(Boolean)
+    .join(" + ");
   const totalPrice =
     quotation.totalPrice === undefined
       ? Math.max(subtotal - discount, 0)
       : toNumber(quotation.totalPrice);
+  const quotationCurrency = quotation.currency || "USD";
+  const showExchangeRate = shouldShowExchangeRate({
+    currency: quotationCurrency,
+  });
 
   return (
     <View style={styles.container}>
@@ -56,8 +70,16 @@ export default function QuotationPdf({
         </View>
         <View style={styles.infoRow}>
           <Text>العملة:</Text>
-          <Text style={styles.ltr}>{quotation.currency || "USD"}</Text>
+          <Text style={styles.ltr}>{quotationCurrency}</Text>
         </View>
+        {showExchangeRate && (
+          <View style={styles.infoRow}>
+            <Text>سعر الصرف:</Text>
+            <Text style={styles.ltr}>
+              {formatExchangeRate(quotation.exchangeRate)}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.table}>
@@ -90,7 +112,10 @@ export default function QuotationPdf({
       {discount > 0 && (
         <View style={styles.totalContainer}>
           <Text style={styles.totalLabel}>الحسم:</Text>
-          <Text style={styles.totalAmount}>{formatAmount(discount)}</Text>
+          <Text style={styles.totalAmount}>
+            {formatAmount(discount)}
+            {discountDetails ? ` (${discountDetails})` : ""}
+          </Text>
         </View>
       )}
 

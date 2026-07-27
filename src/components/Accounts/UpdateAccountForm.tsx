@@ -41,7 +41,7 @@ export default function UpdateAccountForm({ account, onClose }: UpdateAccountFor
 
     const currencies = [
         { id: 'USD', name: 'دولار أمريكي' },
-        { id: 'SYR', name: 'ليرة سورية' },
+        { id: 'SYP', name: 'ليرة سورية' },
         { id: 'SAR', name: 'ريال سعودي' },
     ]
 

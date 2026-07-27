@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useInvoiceDraftSync } from "@/hooks/useInvoiceDraftSync";
 import { useOfflineSalesSync } from "@/hooks/useOfflineSalesSync";
+import { buildInvoiceMoney, formatExchangeRate, formatMoney } from "@/lib/money";
 import getAllCustomer from "@/services/customer";
 import { InvoicePaymentStatus } from "@/services/invoiceDraft";
 import { markQuotationConverted } from "@/services/quotations";
@@ -81,7 +82,8 @@ export default function SellProduct() {
   } = useOfflineSalesSync(queryClient);
 
   const selectedProducts = draft.products;
-  const discount = draft.discount;
+  const discountAmount = draft.discountAmount ?? draft.discount;
+  const discountPercent = draft.discountPercent ?? "";
   const paymentStatus = draft.paymentStatus;
   const partValue = draft.partValue;
   const currency = draft.currency;
@@ -99,10 +101,28 @@ export default function SellProduct() {
     [selectedProducts],
   );
 
-  const finalAmount = useMemo(
-    () => Number((amount - Number(discount || 0)).toFixed(3)),
-    [amount, discount],
+  const saleMoney = useMemo(
+    () =>
+      buildInvoiceMoney({
+        subtotalUSD: amount,
+        paymentStatus,
+        currency: currency || "USD",
+        exchangeRate,
+        partValue,
+        discountAmountUSD: toNumber(discountAmount),
+        discountPercent: toNumber(discountPercent),
+      }),
+    [
+      amount,
+      currency,
+      discountAmount,
+      discountPercent,
+      exchangeRate,
+      partValue,
+      paymentStatus,
+    ],
   );
+  const finalAmount = saleMoney.totalUSD;
 
   useEffect(() => {
     const quotation = (location.state as any)?.quotation;
@@ -118,16 +138,29 @@ export default function SellProduct() {
       {
         customerId: quotation.customerId || "",
         products: Array.isArray(quotation.products)
-          ? quotation.products.map((product: any) => ({
+            ? quotation.products.map((product: any) => ({
               ...product,
               qty: toNumber(product.qty),
               sellPrice: toNumber(product.sellPrice),
+              selectedPriceType: "custom",
             }))
           : [],
         discount:
           quotation.discount === undefined || quotation.discount === null
             ? ""
             : String(quotation.discount),
+        discountAmount:
+          quotation.discountAmountUSD === undefined ||
+          quotation.discountAmountUSD === null
+            ? quotation.discount === undefined || quotation.discount === null
+              ? ""
+              : String(quotation.discount)
+            : String(quotation.discountAmountUSD),
+        discountPercent:
+          quotation.discountPercent === undefined ||
+          quotation.discountPercent === null
+            ? ""
+            : String(quotation.discountPercent),
         currency: quotation.currency || "USD",
         exchangeRate:
           quotation.currency === "USD"
@@ -208,13 +241,12 @@ export default function SellProduct() {
       return false;
     }
 
-    if ((paymentStatus === "cash" || paymentStatus === "part") && !currency) {
+    if (!currency) {
       toast.error("الرجاء اختيار العملة المدفوعة");
       return false;
     }
 
     if (
-      (paymentStatus === "cash" || paymentStatus === "part") &&
       currency !== "USD" &&
       (!exchangeRate || exchangeRate <= 0)
     ) {
@@ -259,6 +291,21 @@ export default function SellProduct() {
 
     if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
       toast.error("قيمة الفاتورة يجب أن تكون أكبر من صفر");
+      return;
+    }
+
+    if (toNumber(discountPercent) < 0 || toNumber(discountPercent) > 100) {
+      toast.error("نسبة الحسم يجب أن تكون بين 0 و 100");
+      return;
+    }
+
+    if (toNumber(discountAmount) < 0) {
+      toast.error("مبلغ الحسم لا يمكن أن يكون سالبا");
+      return;
+    }
+
+    if (saleMoney.discountUSD >= amount) {
+      toast.error("الحسم يجب أن يكون أقل من مجموع الفاتورة");
       return;
     }
 
@@ -309,19 +356,7 @@ export default function SellProduct() {
       return;
     }
 
-    const saleCurrency = paymentStatus === "debt" ? currency || "USD" : currency;
-    const saleExchangeRate = saleCurrency === "USD" ? 1 : toNumber(exchangeRate);
-
-    const paidAmount =
-      paymentStatus === "cash"
-        ? finalAmount
-        : paymentStatus === "part"
-          ? saleCurrency === "USD"
-            ? toNumber(partValue)
-            : Number((toNumber(partValue) / saleExchangeRate).toFixed(3))
-          : 0;
-
-    if (paymentStatus === "part" && paidAmount >= finalAmount) {
+    if (paymentStatus === "part" && saleMoney.paidUSD >= finalAmount) {
       toast.error("الدفعة الجزئية يجب أن تكون أقل من إجمالي الفاتورة");
       return;
     }
@@ -339,17 +374,36 @@ export default function SellProduct() {
           product.payPrice === undefined ? undefined : toNumber(product.payPrice),
       })),
       paymentStatus,
-      remainingDebt: paymentStatus === "cash" ? 0 : finalAmount - paidAmount,
+      remainingDebt: saleMoney.remainingUSD,
       paymentAccountId:
         paymentStatus === "debt" ? undefined : paymentAccountId,
       receivableAccountId:
         paymentStatus === "cash" ? undefined : receivableAccountId,
       salesAccountId,
-      currency: saleCurrency,
-      exchangeRate: saleExchangeRate,
-      amount_base: finalAmount * saleExchangeRate,
-      partValue: toNumber(partValue),
-      discount: toNumber(discount),
+      currency: saleMoney.paymentCurrency,
+      paymentCurrency: saleMoney.paymentCurrency,
+      priceCurrency: saleMoney.priceCurrency,
+      exchangeRate: saleMoney.exchangeRate,
+      amount_base: saleMoney.totalOriginal,
+      subtotalUSD: saleMoney.subtotalUSD,
+      totalUSD: saleMoney.totalUSD,
+      totalSYP: saleMoney.totalSYP,
+      totalOriginal: saleMoney.totalOriginal,
+      paidUSD: saleMoney.paidUSD,
+      paidSYP: saleMoney.paidSYP,
+      paidOriginal: saleMoney.paidOriginal,
+      remainingUSD: saleMoney.remainingUSD,
+      remainingSYP: saleMoney.remainingSYP,
+      remainingOriginal: saleMoney.remainingOriginal,
+      discountType: saleMoney.discountType,
+      discountPercent: saleMoney.discountPercent,
+      discountPercentUSD: saleMoney.discountPercentUSD,
+      discountAmountUSD: saleMoney.discountAmountUSD,
+      discountUSD: saleMoney.discountUSD,
+      discountSYP: saleMoney.discountSYP,
+      discountOriginal: saleMoney.discountOriginal,
+      partValue: saleMoney.paidOriginal,
+      discount: saleMoney.discountUSD,
     };
 
     if (!isOnline) {
@@ -480,12 +534,25 @@ export default function SellProduct() {
 
           <form className="mt-2 grid grid-cols-1 gap-3 md:col-span-3 md:grid-cols-2">
             <FormInput
-              label="الحسم"
+              label="حسم نسبة %"
+              id="discount-percent"
+              type="text"
+              value={discountPercent}
+              onChange={(event) =>
+                patchDraft({ discountPercent: event.target.value })
+              }
+            />
+
+            <FormInput
+              label="حسم مبلغ"
               id="discount-amount"
               type="text"
-              value={discount}
+              value={discountAmount}
               onChange={(event) =>
-                patchDraft({ discount: event.target.value })
+                patchDraft({
+                  discountAmount: event.target.value,
+                  discount: event.target.value,
+                })
               }
             />
 
@@ -535,7 +602,7 @@ export default function SellProduct() {
               />
             )}
 
-            {paymentStatus !== "debt" && (
+            <>
               <>
                 <Select
                   value={currency}
@@ -569,7 +636,27 @@ export default function SellProduct() {
                   disabled={currency === "USD"}
                 />
               </>
-            )}
+            </>
+
+            <div className="rounded-md border bg-muted/30 p-3 text-sm md:col-span-2">
+              <div className="grid gap-1 sm:grid-cols-3">
+                <span>الإجمالي: {formatMoney(saleMoney.totalUSD, "USD")}</span>
+                <span>المدفوع: {formatMoney(saleMoney.paidUSD, "USD")}</span>
+                <span>المتبقي: {formatMoney(saleMoney.remainingUSD, "USD")}</span>
+              </div>
+              {saleMoney.paymentCurrency === "SYP" && (
+                <div className="mt-1 grid gap-1 sm:grid-cols-3">
+                  <span>الإجمالي: {formatMoney(saleMoney.totalSYP, "SYP")}</span>
+                  <span>المدفوع: {formatMoney(saleMoney.paidSYP, "SYP")}</span>
+                  <span>المتبقي: {formatMoney(saleMoney.remainingSYP, "SYP")}</span>
+                </div>
+              )}
+              {saleMoney.paymentCurrency === "SYP" && (
+                <div className="mt-1 text-muted-foreground">
+                  سعر الصرف المعتمد: {formatExchangeRate(saleMoney.exchangeRate)}
+                </div>
+              )}
+            </div>
 
             <AccountSelect
               label="حساب المبيعات"

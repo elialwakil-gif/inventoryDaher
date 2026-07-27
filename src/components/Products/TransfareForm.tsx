@@ -157,10 +157,7 @@ export default function TransferForm({
       oldWarehouse: row.warehouse,
       newWarehouse: values.warehouse,
       exchangeRate: values.currency === "USD" ? 1 : values.exchangeRate,
-      amount_base:
-        values.currency === "USD"
-          ? values.amount
-          : values.amount * values.exchangeRate,
+      amount_base: values.amount,
       amount: values.amount,
       currency: values.currency,
       quantity: values.quantity,

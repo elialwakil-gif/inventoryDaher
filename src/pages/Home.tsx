@@ -28,6 +28,16 @@ function formatCurrency(value: number) {
   });
 }
 
+const toNumber = (value: unknown) => {
+  const next = Number(value);
+  return Number.isFinite(next) ? next : 0;
+};
+
+const formatDualCurrency = (usd: number, syp = 0) => {
+  const usdText = `${formatCurrency(usd)} USD`;
+  return syp ? `${usdText} / ${formatCurrency(syp)} SYP` : usdText;
+};
+
 export default function Home() {
   const navigate = useNavigate();
 
@@ -56,29 +66,50 @@ export default function Home() {
     const salesCount = sells?.length ?? 0;
     const customersCount = customers?.length ?? 0;
 
-    const totalSales = sells
+    const totalSalesUSD = sells
       ? sells.reduce(
-          (sum, sell) => sum + Number(sell.totalPrice ?? sell.amount_base ?? 0),
+          (sum, sell) => sum + toNumber(sell.totalUSD ?? sell.totalPrice),
           0,
         )
       : 0;
+    const totalSalesSYP = sells
+      ? sells.reduce((sum, sell) => sum + toNumber(sell.totalSYP), 0)
+      : 0;
 
-    const totalExpenses = payments
+    const totalExpensesUSD = payments
       ? payments
           .filter((payment: any) => payment.type === "expense")
           .reduce(
             (sum: number, payment: any) =>
-              sum + Math.abs(Number(payment.amount_base ?? payment.amount ?? 0)),
+              sum + Math.abs(toNumber(payment.amountUSD ?? payment.amount)),
+            0,
+          )
+      : 0;
+    const totalExpensesSYP = payments
+      ? payments
+          .filter((payment: any) => payment.type === "expense")
+          .reduce(
+            (sum: number, payment: any) =>
+              sum + Math.abs(toNumber(payment.amountSYP)),
             0,
           )
       : 0;
 
-    const totalIncome = payments
+    const totalIncomeUSD = payments
       ? payments
           .filter((payment: any) => payment.type === "income")
           .reduce(
             (sum: number, payment: any) =>
-              sum + Math.abs(Number(payment.amount_base ?? payment.amount ?? 0)),
+              sum + Math.abs(toNumber(payment.amountUSD ?? payment.amount)),
+            0,
+          )
+      : 0;
+    const totalIncomeSYP = payments
+      ? payments
+          .filter((payment: any) => payment.type === "income")
+          .reduce(
+            (sum: number, payment: any) =>
+              sum + Math.abs(toNumber(payment.amountSYP)),
             0,
           )
       : 0;
@@ -86,7 +117,7 @@ export default function Home() {
     return [
       {
         title: "إجمالي المبيعات",
-        value: `${formatCurrency(totalSales)} $`,
+        value: formatDualCurrency(totalSalesUSD, totalSalesSYP),
         icon: TrendingUp,
         trendIcon: ArrowUpRight,
         color: "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -94,7 +125,7 @@ export default function Home() {
       },
       {
         title: "إجمالي المصاريف",
-        value: `${formatCurrency(totalExpenses)} $`,
+        value: formatDualCurrency(totalExpensesUSD, totalExpensesSYP),
         icon: TrendingDown,
         trendIcon: ArrowDownRight,
         color: "bg-rose-50 text-rose-700 border-rose-100",
@@ -102,7 +133,10 @@ export default function Home() {
       },
       {
         title: "صافي الصندوق",
-        value: `${formatCurrency(totalIncome - totalExpenses)} $`,
+        value: formatDualCurrency(
+          totalIncomeUSD - totalExpensesUSD,
+          totalIncomeSYP - totalExpensesSYP,
+        ),
         icon: Wallet,
         trendIcon: ArrowUpRight,
         color: "bg-sky-50 text-sky-700 border-sky-100",
@@ -144,7 +178,8 @@ export default function Home() {
           : payment.type === "income"
             ? "قبض من عميل"
             : "دفعة",
-      amount: Math.abs(Number(payment.amount_base ?? payment.amount ?? 0)),
+      amount: Math.abs(toNumber(payment.amountUSD ?? payment.amount)),
+      amountSYP: Math.abs(toNumber(payment.amountSYP)),
       sign: payment.type === "expense" ? -1 : 1,
       date: payment.date || "",
     }));
@@ -152,7 +187,8 @@ export default function Home() {
     const sellOperations = (sells || []).map((sell: any) => ({
       id: sell.id ?? `sell-${sell.date}`,
       label: "فاتورة بيع",
-      amount: Number(sell.totalPrice ?? sell.amount_base ?? 0),
+      amount: toNumber(sell.totalUSD ?? sell.totalPrice),
+      amountSYP: toNumber(sell.totalSYP),
       sign: 1,
       date: sell.date || "",
     }));
@@ -326,7 +362,7 @@ export default function Home() {
                       }`}
                     >
                       {operation.sign > 0 ? "+" : "-"}
-                      {formatCurrency(operation.amount)} $
+                      {formatDualCurrency(operation.amount, operation.amountSYP)}
                     </span>
                   </div>
                 ))

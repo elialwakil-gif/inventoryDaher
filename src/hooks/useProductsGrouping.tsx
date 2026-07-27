@@ -1,4 +1,5 @@
 import { Product } from "@/services/transaction";
+import { queryKeys } from "@/lib/queryKeys";
 import { useQueryClient } from "@tanstack/react-query";
 
 export type GroupedProducts = Record<string, Product[]>;
@@ -7,7 +8,9 @@ export function useProductsGrouping() {
   const queryClient = useQueryClient();
 
   const groupByCategory = (): GroupedProducts => {
-    const products = queryClient.getQueryData<Product[]>(["products-table"]);
+    const products =
+      queryClient.getQueryData<Product[]>([...queryKeys.products, "table"]) ||
+      queryClient.getQueryData<Product[]>(queryKeys.products);
 
     if (!products) return {};
 

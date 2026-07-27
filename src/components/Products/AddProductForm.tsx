@@ -21,6 +21,7 @@ import WarehouseSelect from "../Warehouses/WarehouseSelect";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/queryKeys";
 import { useProductsGrouping } from "@/hooks/useProductsGrouping";
+import { buildInvoiceMoney } from "@/lib/money";
 
 type FormValues = z.infer<typeof addProductSchema>;
 
@@ -77,6 +78,8 @@ export default function AddProductForm({
       category: row.category,
       warehouse: row.warehouse,
       payPrice: row.payPrice,
+      wholesalePrice: row.wholesalePrice ?? row.sellPrice,
+      superWholesalePrice: row.superWholesalePrice ?? row.wholesalePrice ?? row.sellPrice,
       sellPrice: row.sellPrice,
       unit: row.unit,
       quantity: row.quantity ?? 1,
@@ -121,7 +124,7 @@ export default function AddProductForm({
   const onSubmit = (values: FormValues) => {
     const total = values.quantity * values.payPrice;
 
-    if (values.isDebt !== "debt" && !values.currency) {
+    if (!values.currency) {
       toast.error("الرجاء اختيار العملة");
       return;
     }
@@ -132,7 +135,6 @@ export default function AddProductForm({
     }
 
     if (
-      values.isDebt !== "debt" &&
       values.currency === "SYP" &&
       values.exchangeRate <= 0
     ) {
@@ -140,7 +142,15 @@ export default function AddProductForm({
       return;
     }
 
-    if (values.isDebt === "part" && (values.partValue ?? 0) >= total) {
+    const purchaseMoney = buildInvoiceMoney({
+      totalUSD: total,
+      paymentStatus: values.isDebt,
+      currency: values.currency,
+      exchangeRate: values.exchangeRate,
+      partValue: values.partValue,
+    });
+
+    if (values.isDebt === "part" && purchaseMoney.paidUSD >= total) {
       toast.error("قيمة الدفعة الجزئية لا يمكن أن تكون أكبر أو تساوي المبلغ الكلي");
       return;
     }
@@ -150,16 +160,6 @@ export default function AddProductForm({
       return;
     }
 
-    const remainingDebt =
-      values.isDebt === "debt"
-        ? total
-        : values.isDebt === "cash"
-        ? 0
-        : total -
-          (values.currency === "USD"
-            ? values.partValue!
-            : Number((values.partValue! / values.exchangeRate).toFixed(1)));
-
     mutation.mutate({
       newProduct: {
         name: values.name,
@@ -167,6 +167,8 @@ export default function AddProductForm({
         category: values.category,
         warehouse: values.warehouse,
         payPrice: values.payPrice,
+        wholesalePrice: values.wholesalePrice,
+        superWholesalePrice: values.superWholesalePrice,
         sellPrice: values.sellPrice,
         unit: values.unit,
         quantity: values.quantity,
@@ -179,12 +181,26 @@ export default function AddProductForm({
         warehouse: values.warehouse,
         quantity: values.quantity,
         payPrice: values.payPrice,
-        currency: values.currency!,
-        exchangeRate: values.exchangeRate,
-        amount_base: total * values.exchangeRate,
-        totalPrice: total,
-        paymentStatus: "pending",
-        remainingDebt,
+        wholesalePrice: values.wholesalePrice,
+        superWholesalePrice: values.superWholesalePrice,
+        currency: purchaseMoney.paymentCurrency,
+        paymentCurrency: purchaseMoney.paymentCurrency,
+        priceCurrency: purchaseMoney.priceCurrency,
+        exchangeRate: purchaseMoney.exchangeRate,
+        amount_base: purchaseMoney.totalOriginal,
+        totalPrice: purchaseMoney.totalUSD,
+        totalUSD: purchaseMoney.totalUSD,
+        totalSYP: purchaseMoney.totalSYP,
+        totalOriginal: purchaseMoney.totalOriginal,
+        paidUSD: purchaseMoney.paidUSD,
+        paidSYP: purchaseMoney.paidSYP,
+        paidOriginal: purchaseMoney.paidOriginal,
+        paymentStatus: values.isDebt,
+        remainingDebt: purchaseMoney.remainingUSD,
+        remainingUSD: purchaseMoney.remainingUSD,
+        remainingSYP: purchaseMoney.remainingSYP,
+        remainingOriginal: purchaseMoney.remainingOriginal,
+        partValue: purchaseMoney.paidOriginal,
         inventoryAccountId: values.inventoryAccountId,
         payableAccountId: values.payableAccountId,
         paymentAccountId:
@@ -286,6 +302,18 @@ export default function AddProductForm({
           error={errors.payPrice?.message}
         />
         <FormInput
+          label="سعر الجملة"
+          type="number"
+          {...register("wholesalePrice")}
+          error={errors.wholesalePrice?.message}
+        />
+        <FormInput
+          label="سعر جملة الجملة"
+          type="number"
+          {...register("superWholesalePrice")}
+          error={errors.superWholesalePrice?.message}
+        />
+        <FormInput
           label="سعر المبيع"
           type="number"
           {...register("sellPrice")}
@@ -332,7 +360,7 @@ export default function AddProductForm({
           />
         )}
 
-        {isDebt !== "debt" && (
+        <>
           <>
             <Controller
               control={control}
@@ -365,7 +393,7 @@ export default function AddProductForm({
               error={errors.exchangeRate?.message}
             />
           </>
-        )}
+        </>
 
         <Controller
           control={control}

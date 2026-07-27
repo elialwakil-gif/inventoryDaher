@@ -14,6 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  formatExchangeRate,
+  formatMoney as formatCurrencyAmount,
+  shouldShowExchangeRate,
+} from "@/lib/money";
 import { getSupplierById } from "@/services/supplier";
 import {
   handleSupplierReturn,
@@ -38,6 +43,13 @@ const formatAmount = (value: unknown) =>
   toNumber(value).toLocaleString("en-US", {
     maximumFractionDigits: 2,
   });
+
+const formatDualCurrency = (usd: unknown, syp?: unknown) => {
+  const sypAmount = toNumber(syp);
+  const usdText = formatCurrencyAmount(toNumber(usd), "USD");
+
+  return sypAmount ? `${usdText} / ${formatCurrencyAmount(sypAmount, "SYP")}` : usdText;
+};
 
 const getPaymentStatusLabel = (status?: string) => {
   if (status === "cash") return "نقدي";
@@ -222,24 +234,39 @@ export default function SupplierDetails() {
     () =>
       [...(data?.data?.purchases || [])]
         .map((purchase) => {
-          const totalPrice = toNumber(purchase.totalPrice);
-          const remainingDebt = toNumber(purchase.remainingDebt);
+          const totalPrice = toNumber(purchase.totalUSD ?? purchase.totalPrice);
+          const remainingDebt = toNumber(
+            purchase.remainingUSD ?? purchase.remainingDebt,
+          );
+          const totalSYP = toNumber(purchase.totalSYP);
+          const paidSYP = toNumber(purchase.paidSYP);
+          const remainingSYP = toNumber(purchase.remainingSYP);
           const invoicePayments = Array.isArray(purchase.invoicePayments)
             ? purchase.invoicePayments
             : [];
           const paidAmount =
-            purchase.paidAmount !== undefined
-              ? toNumber(purchase.paidAmount)
+            purchase.paidUSD !== undefined
+              ? toNumber(purchase.paidUSD)
+              : purchase.paidAmount !== undefined
+                ? toNumber(purchase.paidAmount)
               : Math.max(totalPrice - remainingDebt, 0);
           const invoicePaymentsDisplay = invoicePayments.length
             ? invoicePayments
                 .map(
-                  (payment) =>
-                    `${formatAmount(Math.abs(toNumber(payment.amount)))} - ${
+                  (payment) => {
+                    const exchangeRateText = shouldShowExchangeRate(payment)
+                      ? ` (${formatExchangeRate(payment.exchangeRate)})`
+                      : "";
+
+                    return `${formatDualCurrency(
+                      Math.abs(toNumber(payment.amountUSD ?? payment.amount)),
+                      Math.abs(toNumber(payment.amountSYP)),
+                    )}${exchangeRateText} - ${
                       payment.date
                         ? new Date(payment.date).toLocaleDateString("en-GB")
                         : ""
-                    }`,
+                    }`;
+                  },
                 )
                 .join(" | ")
             : "-";
@@ -260,11 +287,14 @@ export default function SupplierDetails() {
               purchase.paymentStatusLabel ||
               getPaymentStatusLabel(purchase.paymentStatus),
             totalPrice,
-            totalPriceDisplay: formatAmount(totalPrice),
+            totalPriceDisplay: formatDualCurrency(totalPrice, totalSYP),
             paidAmount,
-            paidAmountDisplay: formatAmount(paidAmount),
+            paidAmountDisplay: formatDualCurrency(paidAmount, paidSYP),
             remainingDebt,
-            remainingDebtDisplay: formatAmount(remainingDebt),
+            remainingDebtDisplay: formatDualCurrency(
+              remainingDebt,
+              remainingSYP,
+            ),
             invoicePaymentsDisplay,
             currency: purchase.currency || "-",
             productsString,
@@ -283,7 +313,10 @@ export default function SupplierDetails() {
           invoiceReference: payment.purchaseId
             ? `فاتورة ${String(payment.purchaseId).slice(0, 8)}`
             : "-",
-          amountDisplay: formatAmount(Math.abs(toNumber(payment.amount))),
+          amountDisplay: formatDualCurrency(
+            Math.abs(toNumber(payment.amountUSD ?? payment.amount)),
+            Math.abs(toNumber(payment.amountSYP)),
+          ),
           currency: payment.currency || "-",
         }))
         .sort((a, b) => parseDate(b.date) - parseDate(a.date)),
@@ -303,6 +336,10 @@ export default function SupplierDetails() {
       ).length,
       remainingDebt: supplierPurchases.reduce(
         (sum, purchase) => sum + toNumber(purchase.remainingDebt),
+        0,
+      ),
+      remainingDebtSYP: supplierPurchases.reduce(
+        (sum, purchase) => sum + toNumber(purchase.remainingSYP),
         0,
       ),
     }),
@@ -351,8 +388,12 @@ export default function SupplierDetails() {
     paySupplierDebtMutation.mutate({
       supplierId: getCurrentSupplierId(),
       amount: sign * amountInBaseCurrency,
+      amountUSD: sign * amountInBaseCurrency,
+      amountSYP: currency === "SYP" ? sign * amountNumber : 0,
+      amountOriginal: sign * amountNumber,
       note,
       currency,
+      paymentCurrency: currency as "USD" | "SYP",
       exchangeRate: currency === "USD" ? 1 : exchangeRate,
       amount_base: sign * amountNumber,
       paymentAccountId,
@@ -361,16 +402,19 @@ export default function SupplierDetails() {
   };
 
   const openInvoicePayment = (purchase: any) => {
-    const nextCurrency = purchase.currency || "USD";
+    const nextCurrency = purchase.paymentCurrency || purchase.currency || "USD";
     const nextExchangeRate =
       nextCurrency === "USD" ? 1 : toNumber(purchase.exchangeRate) || 1;
-    const remainingDebt = toNumber(purchase.remainingDebt);
+    const remainingDebt = toNumber(
+      purchase.remainingUSD ?? purchase.remainingDebt,
+    );
 
     setInvoicePaymentOpenId(purchase.id);
     setInvoicePaymentAmount(
       nextCurrency === "USD"
         ? remainingDebt
-        : Number((remainingDebt * nextExchangeRate).toFixed(3)),
+        : toNumber(purchase.remainingSYP) ||
+          Number((remainingDebt * nextExchangeRate).toFixed(3)),
     );
     setInvoicePaymentNote(
       `تسديد فاتورة شراء ${String(purchase.code || purchase.id).slice(0, 12)}`,
@@ -382,7 +426,9 @@ export default function SupplierDetails() {
   };
 
   const submitInvoicePayment = (purchase: any) => {
-    const remainingDebt = toNumber(purchase.remainingDebt);
+    const remainingDebt = toNumber(
+      purchase.remainingUSD ?? purchase.remainingDebt,
+    );
     const amountInBaseCurrency = getPaymentAmountInBaseCurrency(
       invoicePaymentAmount,
       invoicePaymentCurrency,
@@ -416,6 +462,10 @@ export default function SupplierDetails() {
       supplierId: getCurrentSupplierId(),
       purchaseId: purchase.id,
       amount: -amountInBaseCurrency,
+      amountUSD: -amountInBaseCurrency,
+      amountSYP:
+        invoicePaymentCurrency === "SYP" ? -invoicePaymentAmount : 0,
+      amountOriginal: -invoicePaymentAmount,
       note:
         invoicePaymentNote ||
         `تسديد فاتورة شراء ${String(purchase.code || purchase.id).slice(
@@ -423,6 +473,7 @@ export default function SupplierDetails() {
           12,
         )}`,
       currency: invoicePaymentCurrency,
+      paymentCurrency: invoicePaymentCurrency as "USD" | "SYP",
       exchangeRate: invoicePaymentCurrency === "USD" ? 1 : invoicePaymentExchangeRate,
       amount_base: -invoicePaymentAmount,
       paymentAccountId,
@@ -432,11 +483,12 @@ export default function SupplierDetails() {
 
   const getInvoicePaymentMaxAmount = (purchase: any) =>
     invoicePaymentCurrency === "USD"
-      ? toNumber(purchase.remainingDebt)
+      ? toNumber(purchase.remainingUSD ?? purchase.remainingDebt)
       : Number(
           (
-            toNumber(purchase.remainingDebt) *
-            toNumber(invoicePaymentExchangeRate)
+            toNumber(purchase.remainingSYP) ||
+            toNumber(purchase.remainingUSD ?? purchase.remainingDebt) *
+              toNumber(invoicePaymentExchangeRate)
           ).toFixed(3),
         );
 
@@ -700,7 +752,10 @@ export default function SupplierDetails() {
                     إجمالي المتبقي
                   </p>
                   <p className="text-xl font-bold text-destructive">
-                    {formatAmount(purchasesSummary.remainingDebt)}
+                    {formatDualCurrency(
+                      purchasesSummary.remainingDebt,
+                      purchasesSummary.remainingDebtSYP,
+                    )}
                   </p>
                 </div>
               </div>
@@ -747,15 +802,26 @@ export default function SupplierDetails() {
                         <div className="rounded-md border p-3 text-sm">
                           <div className="flex justify-between">
                             <span>إجمالي الفاتورة</span>
-                            <span>{formatAmount(row.totalPrice)}</span>
+                            <span>{formatDualCurrency(row.totalPrice, row.totalSYP)}</span>
                           </div>
+                          {shouldShowExchangeRate(row) && (
+                            <div className="flex justify-between">
+                              <span>سعر الصرف</span>
+                              <span>{formatExchangeRate(row.exchangeRate)}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between">
                             <span>المدفوع</span>
-                            <span>{formatAmount(row.paidAmount)}</span>
+                            <span>{formatDualCurrency(row.paidAmount, row.paidSYP)}</span>
                           </div>
                           <div className="flex justify-between font-bold text-destructive">
                             <span>المتبقي</span>
-                            <span>{formatAmount(row.remainingDebt)}</span>
+                            <span>
+                              {formatDualCurrency(
+                                row.remainingDebt,
+                                row.remainingSYP,
+                              )}
+                            </span>
                           </div>
                         </div>
 

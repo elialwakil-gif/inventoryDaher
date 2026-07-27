@@ -7,6 +7,8 @@ export const addProductSchema = z.object({
   category: z.string().min(1, "الصنف مطلوب"),
   warehouse: z.string().min(1, "المستودع مطلوب"),
   payPrice: z.coerce.number().positive(),
+  wholesalePrice: z.coerce.number().positive(),
+  superWholesalePrice: z.coerce.number().positive(),
   sellPrice: z.coerce.number().positive(),
   quantity: z.coerce.number().positive(),
   alertQuantity: z.coerce.number().min(0).default(5),

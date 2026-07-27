@@ -88,6 +88,7 @@ export default function MaterialReservations() {
     {},
   );
   const [discount, setDiscount] = useState("");
+  const [discountPercent, setDiscountPercent] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("cash");
   const [currency, setCurrency] = useState("USD");
   const [exchangeRate, setExchangeRate] = useState(1);
@@ -140,13 +141,27 @@ export default function MaterialReservations() {
     }, 0);
   }, [selectedReservation, usedQuantities]);
 
+  const closeDiscountPercentAmount = useMemo(
+    () =>
+      Number(
+        (
+          closeTotalBeforeDiscount *
+          (Math.max(toNumber(discountPercent), 0) / 100)
+        ).toFixed(3),
+      ),
+    [closeTotalBeforeDiscount, discountPercent],
+  );
+  const closeDiscountTotal = useMemo(
+    () => Number((closeDiscountPercentAmount + Math.max(toNumber(discount), 0)).toFixed(3)),
+    [closeDiscountPercentAmount, discount],
+  );
   const closeFinalTotal = useMemo(
     () =>
       Math.max(
-        Number((closeTotalBeforeDiscount - toNumber(discount)).toFixed(3)),
+        Number((closeTotalBeforeDiscount - closeDiscountTotal).toFixed(3)),
         0,
       ),
-    [closeTotalBeforeDiscount, discount],
+    [closeDiscountTotal, closeTotalBeforeDiscount],
   );
 
   const resetCreateForm = () => {
@@ -161,6 +176,7 @@ export default function MaterialReservations() {
     setSelectedReservation(null);
     setUsedQuantities({});
     setDiscount("");
+    setDiscountPercent("");
     setPaymentStatus("cash");
     setCurrency("USD");
     setExchangeRate(1);
@@ -321,6 +337,7 @@ export default function MaterialReservations() {
     setSelectedReservation(reservation);
     setUsedQuantities(nextUsedQuantities);
     setDiscount("");
+    setDiscountPercent("");
     setPaymentStatus("cash");
     setCurrency("USD");
     setExchangeRate(1);
@@ -358,8 +375,18 @@ export default function MaterialReservations() {
       return;
     }
 
-    if (toNumber(discount) > closeTotalBeforeDiscount) {
-      toast.error("الحسم لا يمكن أن يكون أكبر من المجموع");
+    if (toNumber(discountPercent) < 0 || toNumber(discountPercent) > 100) {
+      toast.error("نسبة الحسم يجب أن تكون بين 0 و 100");
+      return;
+    }
+
+    if (toNumber(discount) < 0) {
+      toast.error("مبلغ الحسم لا يمكن أن يكون سالبا");
+      return;
+    }
+
+    if (closeDiscountTotal >= closeTotalBeforeDiscount && closeTotalBeforeDiscount > 0) {
+      toast.error("الحسم يجب أن يكون أقل من المجموع");
       return;
     }
 
@@ -423,7 +450,10 @@ export default function MaterialReservations() {
         })),
         sell: {
           paymentStatus,
-          discount: toNumber(discount),
+          discount: closeDiscountTotal,
+          discountPercent: toNumber(discountPercent),
+          discountPercentUSD: closeDiscountPercentAmount,
+          discountAmountUSD: toNumber(discount),
           currency,
           exchangeRate: currency === "USD" ? 1 : exchangeRate,
           partValue: toNumber(partValue),
@@ -722,9 +752,17 @@ export default function MaterialReservations() {
                 </CardContent>
               </Card>
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-3">
                 <FormInput
-                  label="الحسم"
+                  label="حسم نسبة %"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={discountPercent}
+                  onChange={(event) => setDiscountPercent(event.target.value)}
+                />
+                <FormInput
+                  label="حسم مبلغ"
                   type="number"
                   min={0}
                   value={discount}
@@ -757,7 +795,7 @@ export default function MaterialReservations() {
                     ))}
                   </div>
 
-                  {paymentStatus !== "debt" && (
+                  <>
                     <div className="grid gap-3 md:grid-cols-2">
                       <div>
                         <label className="mb-1 block text-sm font-medium">
@@ -790,7 +828,7 @@ export default function MaterialReservations() {
                         }
                       />
                     </div>
-                  )}
+                  </>
 
                   {paymentStatus === "part" && (
                     <FormInput

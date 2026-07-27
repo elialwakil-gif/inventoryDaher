@@ -1,5 +1,5 @@
 import apiClient from "@/lib/axios";
-import type { Product, sell } from "@/services/transaction";
+import type { Product, ProductPriceType, sell } from "@/services/transaction";
 
 export type InvoicePaymentStatus = "cash" | "part" | "debt";
 
@@ -7,6 +7,7 @@ export type InvoiceDraftProduct = Product & {
   productId?: string;
   qty: number;
   totalPrice?: number;
+  selectedPriceType?: ProductPriceType;
 };
 
 export interface InvoiceDraft {
@@ -15,6 +16,8 @@ export interface InvoiceDraft {
   customerId: string;
   products: InvoiceDraftProduct[];
   discount: string;
+  discountPercent?: string;
+  discountAmount?: string;
   paymentStatus: InvoicePaymentStatus;
   partValue: string;
   currency: string;
@@ -34,13 +37,29 @@ const toNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(next) ? next : fallback;
 };
 
+const normalizePriceType = (value: unknown): ProductPriceType => {
+  const next = String(value || "custom");
+
+  return [
+    "payPrice",
+    "wholesalePrice",
+    "superWholesalePrice",
+    "sellPrice",
+    "custom",
+  ].includes(next)
+    ? (next as ProductPriceType)
+    : "custom";
+};
+
 export const createEmptyInvoiceDraft = (): InvoiceDraft => ({
   customerId: "",
   products: [],
   discount: "",
+  discountPercent: "",
+  discountAmount: "",
   paymentStatus: "cash",
   partValue: "",
-  currency: "",
+  currency: "USD",
   exchangeRate: 1,
   paymentAccountId: "",
   receivableAccountId: "",
@@ -56,7 +75,10 @@ export const normalizeInvoiceDraftProduct = (
   code: String(product?.code || product?.productCode || ""),
   category: String(product?.category || ""),
   payPrice: toNumber(product?.payPrice),
+  wholesalePrice: toNumber(product?.wholesalePrice),
+  superWholesalePrice: toNumber(product?.superWholesalePrice),
   sellPrice: toNumber(product?.sellPrice),
+  selectedPriceType: normalizePriceType(product?.selectedPriceType),
   unit: String(product?.unit || ""),
   quantity: toNumber(product?.quantity),
   warehouse: String(product?.warehouse || ""),
@@ -86,6 +108,14 @@ export const normalizeInvoiceDraft = (
       rawDraft.discount === undefined || rawDraft.discount === null
         ? ""
         : String(rawDraft.discount),
+    discountPercent:
+      rawDraft.discountPercent === undefined || rawDraft.discountPercent === null
+        ? ""
+        : String(rawDraft.discountPercent),
+    discountAmount:
+      rawDraft.discountAmount === undefined || rawDraft.discountAmount === null
+        ? ""
+        : String(rawDraft.discountAmount),
     paymentStatus: ["cash", "part", "debt"].includes(
       String(rawDraft.paymentStatus),
     )

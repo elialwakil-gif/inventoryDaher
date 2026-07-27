@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { buildInvoiceMoney, formatExchangeRate, formatMoney } from "@/lib/money";
 import { queryKeys } from "@/lib/queryKeys";
 import getAllProducts from "@/services/products";
 import { Product, purchaseInvoice } from "@/services/transaction";
@@ -23,12 +24,14 @@ import { toast } from "sonner";
 type SelectedPurchaseProduct = Product & {
   qty: number;
   purchasePayPrice: number;
+  purchaseWholesalePrice: number;
+  purchaseSuperWholesalePrice: number;
   purchaseSellPrice: number;
 };
 
-const toNumber = (value: unknown) => {
+const toNumber = (value: unknown, fallback = 0) => {
   const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? numberValue : 0;
+  return Number.isFinite(numberValue) ? numberValue : fallback;
 };
 
 function FieldBlock({
@@ -94,6 +97,18 @@ export default function Purchases() {
     [selectedProducts],
   );
 
+  const purchaseMoney = useMemo(
+    () =>
+      buildInvoiceMoney({
+        totalUSD: totalPrice,
+        paymentStatus,
+        currency,
+        exchangeRate,
+        partValue,
+      }),
+    [currency, exchangeRate, partValue, paymentStatus, totalPrice],
+  );
+
   const mutation = useMutation({
     mutationFn: purchaseInvoice,
     onSuccess: () => {
@@ -135,6 +150,11 @@ export default function Purchases() {
           ...product,
           qty: 1,
           purchasePayPrice: toNumber(product.payPrice),
+          purchaseWholesalePrice: toNumber(product.wholesalePrice, toNumber(product.sellPrice)),
+          purchaseSuperWholesalePrice: toNumber(
+            product.superWholesalePrice,
+            toNumber(product.wholesalePrice, toNumber(product.sellPrice)),
+          ),
           purchaseSellPrice: toNumber(product.sellPrice),
         },
       ];
@@ -162,7 +182,12 @@ export default function Purchases() {
 
   const updateSelectedProduct = (
     id: string,
-    key: "qty" | "purchasePayPrice" | "purchaseSellPrice",
+    key:
+      | "qty"
+      | "purchasePayPrice"
+      | "purchaseWholesalePrice"
+      | "purchaseSuperWholesalePrice"
+      | "purchaseSellPrice",
     value: number,
   ) => {
     setSelectedProducts((current) =>
@@ -195,9 +220,15 @@ export default function Purchases() {
     }
 
     if (
-      selectedProducts.some((product) => toNumber(product.purchasePayPrice) <= 0)
+      selectedProducts.some(
+        (product) =>
+          toNumber(product.purchasePayPrice) <= 0 ||
+          toNumber(product.purchaseWholesalePrice) <= 0 ||
+          toNumber(product.purchaseSuperWholesalePrice) <= 0 ||
+          toNumber(product.purchaseSellPrice) <= 0,
+      )
     ) {
-      toast.error("كل أسعار الشراء يجب أن تكون أكبر من صفر");
+      toast.error("كل أسعار المنتج يجب أن تكون أكبر من صفر");
       return false;
     }
 
@@ -216,7 +247,7 @@ export default function Purchases() {
       return false;
     }
 
-    if (paymentStatus !== "debt" && !currency) {
+    if (!currency) {
       toast.error("الرجاء اختيار العملة");
       return false;
     }
@@ -231,14 +262,7 @@ export default function Purchases() {
       return false;
     }
 
-    const paidAmount =
-      paymentStatus === "part"
-        ? currency === "USD"
-          ? toNumber(partValue)
-          : toNumber(partValue) / toNumber(exchangeRate)
-        : totalPrice;
-
-    if (paymentStatus === "part" && paidAmount >= totalPrice) {
+    if (paymentStatus === "part" && purchaseMoney.paidUSD >= totalPrice) {
       toast.error("الدفعة الجزئية يجب أن تكون أقل من إجمالي الفاتورة");
       return false;
     }
@@ -248,15 +272,6 @@ export default function Purchases() {
 
   const submitInvoice = () => {
     if (!validateForm()) return;
-
-    const paidAmount =
-      paymentStatus === "cash"
-        ? totalPrice
-        : paymentStatus === "part"
-          ? currency === "USD"
-            ? toNumber(partValue)
-            : Number((toNumber(partValue) / toNumber(exchangeRate)).toFixed(3))
-          : 0;
 
     mutation.mutate({
       newPurchase: {
@@ -273,10 +288,22 @@ export default function Purchases() {
         payPrice: 0,
         totalPrice,
         paymentStatus,
-        remainingDebt: totalPrice - paidAmount,
-        currency,
-        exchangeRate: toNumber(exchangeRate) || 1,
-        amount_base: totalPrice * (toNumber(exchangeRate) || 1),
+        remainingDebt: purchaseMoney.remainingUSD,
+        currency: purchaseMoney.paymentCurrency,
+        paymentCurrency: purchaseMoney.paymentCurrency,
+        priceCurrency: purchaseMoney.priceCurrency,
+        exchangeRate: purchaseMoney.exchangeRate,
+        amount_base: purchaseMoney.totalOriginal,
+        totalUSD: purchaseMoney.totalUSD,
+        totalSYP: purchaseMoney.totalSYP,
+        totalOriginal: purchaseMoney.totalOriginal,
+        paidUSD: purchaseMoney.paidUSD,
+        paidSYP: purchaseMoney.paidSYP,
+        paidOriginal: purchaseMoney.paidOriginal,
+        remainingUSD: purchaseMoney.remainingUSD,
+        remainingSYP: purchaseMoney.remainingSYP,
+        remainingOriginal: purchaseMoney.remainingOriginal,
+        partValue: purchaseMoney.paidOriginal,
         inventoryAccountId,
         payableAccountId,
         paymentAccountId:
@@ -289,6 +316,8 @@ export default function Purchases() {
           warehouse: product.warehouse,
           quantity: toNumber(product.qty),
           payPrice: toNumber(product.purchasePayPrice),
+          wholesalePrice: toNumber(product.purchaseWholesalePrice),
+          superWholesalePrice: toNumber(product.purchaseSuperWholesalePrice),
           sellPrice: toNumber(product.purchaseSellPrice),
           unit: product.unit,
           alertQuantity: product.alertQuantity,
@@ -401,7 +430,7 @@ export default function Purchases() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
                       <FieldBlock label="الكمية">
                         <Input
                           type="number"
@@ -426,6 +455,36 @@ export default function Purchases() {
                             updateSelectedProduct(
                               product.id,
                               "purchasePayPrice",
+                              toNumber(event.target.value),
+                            )
+                          }
+                          className="h-10"
+                        />
+                      </FieldBlock>
+                      <FieldBlock label="سعر الجملة">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={product.purchaseWholesalePrice}
+                          onChange={(event) =>
+                            updateSelectedProduct(
+                              product.id,
+                              "purchaseWholesalePrice",
+                              toNumber(event.target.value),
+                            )
+                          }
+                          className="h-10"
+                        />
+                      </FieldBlock>
+                      <FieldBlock label="سعر جملة الجملة">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={product.purchaseSuperWholesalePrice}
+                          onChange={(event) =>
+                            updateSelectedProduct(
+                              product.id,
+                              "purchaseSuperWholesalePrice",
                               toNumber(event.target.value),
                             )
                           }
@@ -460,7 +519,7 @@ export default function Purchases() {
             </div>
 
             <div className="hidden overflow-x-auto rounded-md border md:block">
-              <table className="w-full min-w-[860px] border-collapse text-sm">
+              <table className="w-full min-w-[1080px] border-collapse text-sm">
                 <thead className="bg-muted">
                   <tr>
                     <th className="p-2 text-right">المنتج</th>
@@ -468,6 +527,8 @@ export default function Purchases() {
                     <th className="p-2 text-right">المستودع</th>
                     <th className="p-2 text-right">الكمية</th>
                     <th className="p-2 text-right">سعر الشراء</th>
+                    <th className="p-2 text-right">سعر الجملة</th>
+                    <th className="p-2 text-right">سعر جملة الجملة</th>
                     <th className="p-2 text-right">سعر البيع</th>
                     <th className="p-2 text-right">المجموع</th>
                     <th className="p-2 text-center">حذف</th>
@@ -478,7 +539,7 @@ export default function Purchases() {
                     <tr>
                       <td
                         className="p-6 text-center text-muted-foreground"
-                        colSpan={8}
+                        colSpan={10}
                       >
                         لم تتم إضافة منتجات بعد
                       </td>
@@ -513,6 +574,36 @@ export default function Purchases() {
                               updateSelectedProduct(
                                 product.id,
                                 "purchasePayPrice",
+                                toNumber(event.target.value),
+                              )
+                            }
+                            className="w-28"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            value={product.purchaseWholesalePrice}
+                            onChange={(event) =>
+                              updateSelectedProduct(
+                                product.id,
+                                "purchaseWholesalePrice",
+                                toNumber(event.target.value),
+                              )
+                            }
+                            className="w-28"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            value={product.purchaseSuperWholesalePrice}
+                            onChange={(event) =>
+                              updateSelectedProduct(
+                                product.id,
+                                "purchaseSuperWholesalePrice",
                                 toNumber(event.target.value),
                               )
                             }
@@ -585,7 +676,7 @@ export default function Purchases() {
             </div>
 
             <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-4">
-              {paymentStatus !== "debt" && (
+              <>
                 <>
                   <FieldBlock label="العملة">
                     <Select value={currency} onValueChange={setCurrency}>
@@ -612,14 +703,16 @@ export default function Purchases() {
                     />
                   </FieldBlock>
 
+                  {paymentStatus !== "debt" && (
                   <AccountSelect
                     label="حساب الدفع"
                     value={paymentAccountId}
                     onChange={setPaymentAccountId}
                     filterType="payment"
                   />
+                  )}
                 </>
-              )}
+              </>
 
               {paymentStatus === "part" && (
                 <FieldBlock label="قيمة الدفعة">
@@ -631,6 +724,26 @@ export default function Purchases() {
                     className="h-10"
                   />
                 </FieldBlock>
+              )}
+            </div>
+
+            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+              <div className="grid gap-1 sm:grid-cols-3">
+                <span>الإجمالي: {formatMoney(purchaseMoney.totalUSD, "USD")}</span>
+                <span>المدفوع: {formatMoney(purchaseMoney.paidUSD, "USD")}</span>
+                <span>المتبقي: {formatMoney(purchaseMoney.remainingUSD, "USD")}</span>
+              </div>
+              {purchaseMoney.paymentCurrency === "SYP" && (
+                <div className="mt-1 grid gap-1 sm:grid-cols-3">
+                  <span>الإجمالي: {formatMoney(purchaseMoney.totalSYP, "SYP")}</span>
+                  <span>المدفوع: {formatMoney(purchaseMoney.paidSYP, "SYP")}</span>
+                  <span>المتبقي: {formatMoney(purchaseMoney.remainingSYP, "SYP")}</span>
+                </div>
+              )}
+              {purchaseMoney.paymentCurrency === "SYP" && (
+                <div className="mt-1 text-muted-foreground">
+                  سعر الصرف المعتمد: {formatExchangeRate(purchaseMoney.exchangeRate)}
+                </div>
               )}
             </div>
 

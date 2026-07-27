@@ -16,6 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  formatExchangeRate,
+  formatMoney as formatCurrencyAmount,
+  shouldShowExchangeRate,
+} from "@/lib/money";
 import { getCustomerById } from "@/services/customer";
 import { handleCustomerReturn, payCustomerDebt } from "@/services/transaction";
 import { parseDate } from "@/utils/parseDate";
@@ -39,6 +44,13 @@ const formatAmount = (value: unknown) =>
   toNumber(value).toLocaleString("en-US", {
     maximumFractionDigits: 2,
   });
+
+const formatDualCurrency = (usd: unknown, syp?: unknown) => {
+  const sypAmount = toNumber(syp);
+  const usdText = formatCurrencyAmount(toNumber(usd), "USD");
+
+  return sypAmount ? `${usdText} / ${formatCurrencyAmount(sypAmount, "SYP")}` : usdText;
+};
 
 const getPaymentStatusLabel = (status?: string) => {
   if (status === "cash") return "نقدي";
@@ -180,24 +192,36 @@ export default function CustomerDetails() {
                 purchase.products.length > 0,
             )
             .map((purchase) => {
-              const totalPrice = toNumber(purchase.totalPrice);
-              const remainingDebt = toNumber(purchase.remainingDebt);
+              const totalPrice = toNumber(purchase.totalUSD ?? purchase.totalPrice);
+              const remainingDebt = toNumber(
+                purchase.remainingUSD ?? purchase.remainingDebt,
+              );
+              const totalSYP = toNumber(purchase.totalSYP);
+              const paidSYP = toNumber(purchase.paidSYP);
+              const remainingSYP = toNumber(purchase.remainingSYP);
               const invoicePayments = Array.isArray(purchase.invoicePayments)
                 ? purchase.invoicePayments
                 : [];
               const paidAmount =
-                purchase.paidAmount !== undefined
-                  ? toNumber(purchase.paidAmount)
+                purchase.paidUSD !== undefined
+                  ? toNumber(purchase.paidUSD)
+                  : purchase.paidAmount !== undefined
+                    ? toNumber(purchase.paidAmount)
                   : Math.max(totalPrice - remainingDebt, 0);
               const invoicePaymentsDisplay = invoicePayments.length
                 ? invoicePayments
                     .map(
-                      (payment) =>
-                        `${formatAmount(payment.amount)} - ${
+                      (payment) => {
+                        const exchangeRateText = shouldShowExchangeRate(payment)
+                          ? ` (${formatExchangeRate(payment.exchangeRate)})`
+                          : "";
+
+                        return `${formatDualCurrency(payment.amountUSD ?? payment.amount, payment.amountSYP)}${exchangeRateText} - ${
                           payment.date
                             ? new Date(payment.date).toLocaleDateString("en-GB")
                             : ""
-                        }`,
+                        }`;
+                      },
                     )
                     .join(" | ")
                 : "-";
@@ -207,11 +231,14 @@ export default function CustomerDetails() {
                 status:
                   purchase.paymentStatusLabel ||
                   getPaymentStatusLabel(purchase.paymentStatus),
-                totalPriceDisplay: formatAmount(totalPrice),
+                totalPriceDisplay: formatDualCurrency(totalPrice, totalSYP),
                 paidAmount,
-                paidAmountDisplay: formatAmount(paidAmount),
+                paidAmountDisplay: formatDualCurrency(paidAmount, paidSYP),
                 remainingDebt,
-                remainingDebtDisplay: formatAmount(remainingDebt),
+                remainingDebtDisplay: formatDualCurrency(
+                  remainingDebt,
+                  remainingSYP,
+                ),
                 invoicePaymentsDisplay,
                 currency: purchase.currency || "-",
                 productsString:
@@ -235,7 +262,10 @@ export default function CustomerDetails() {
           invoiceReference: payment.sellId
             ? `فاتورة ${String(payment.sellId).slice(0, 8)}`
             : "-",
-          amountDisplay: formatAmount(payment.amount),
+          amountDisplay: formatDualCurrency(
+            payment.amountUSD ?? payment.amount,
+            payment.amountSYP,
+          ),
           currency: payment.currency || "-",
         }))
         .sort((a, b) => parseDate(b.date) - parseDate(a.date)),
@@ -249,6 +279,10 @@ export default function CustomerDetails() {
       debt: customerSales.filter((sale) => sale.paymentStatus === "debt").length,
       remainingDebt: customerSales.reduce(
         (sum, sale) => sum + toNumber(sale.remainingDebt),
+        0,
+      ),
+      remainingDebtSYP: customerSales.reduce(
+        (sum, sale) => sum + toNumber(sale.remainingSYP),
         0,
       ),
     }),
@@ -280,16 +314,17 @@ export default function CustomerDetails() {
     String(customer?.id || customerId?.id || customerId || "");
 
   const openInvoicePayment = (sale: any) => {
-    const nextCurrency = sale.currency || "USD";
+    const nextCurrency = sale.paymentCurrency || sale.currency || "USD";
     const nextExchangeRate =
       nextCurrency === "USD" ? 1 : toNumber(sale.exchangeRate) || 1;
-    const remainingDebt = toNumber(sale.remainingDebt);
+    const remainingDebt = toNumber(sale.remainingUSD ?? sale.remainingDebt);
 
     setInvoicePaymentOpenId(sale.id);
     setInvoicePaymentAmount(
       nextCurrency === "USD"
         ? remainingDebt
-        : Number((remainingDebt * nextExchangeRate).toFixed(3)),
+        : toNumber(sale.remainingSYP) ||
+          Number((remainingDebt * nextExchangeRate).toFixed(3)),
     );
     setInvoicePaymentNote(`تسديد فاتورة ${String(sale.id).slice(0, 8)}`);
     setInvoicePaymentCurrency(nextCurrency);
@@ -301,7 +336,7 @@ export default function CustomerDetails() {
   };
 
   const submitInvoicePayment = (sale: any) => {
-    const remainingDebt = toNumber(sale.remainingDebt);
+    const remainingDebt = toNumber(sale.remainingUSD ?? sale.remainingDebt);
     const amountInBaseCurrency =
       invoicePaymentCurrency === "USD"
         ? invoicePaymentAmount
@@ -334,8 +369,12 @@ export default function CustomerDetails() {
       customerId: getCurrentCustomerId(),
       sellId: sale.id,
       amount: amountInBaseCurrency,
+      amountUSD: amountInBaseCurrency,
+      amountSYP: invoicePaymentCurrency === "SYP" ? invoicePaymentAmount : 0,
+      amountOriginal: invoicePaymentAmount,
       note: invoicePaymentNote || `تسديد فاتورة ${String(sale.id).slice(0, 8)}`,
       currency: invoicePaymentCurrency,
+      paymentCurrency: invoicePaymentCurrency as "USD" | "SYP",
       exchangeRate: invoicePaymentExchangeRate,
       amount_base: invoicePaymentAmount,
       paymentAccountId,
@@ -345,10 +384,12 @@ export default function CustomerDetails() {
 
   const getInvoicePaymentMaxAmount = (sale: any) =>
     invoicePaymentCurrency === "USD"
-      ? toNumber(sale.remainingDebt)
+      ? toNumber(sale.remainingUSD ?? sale.remainingDebt)
       : Number(
           (
-            toNumber(sale.remainingDebt) * toNumber(invoicePaymentExchangeRate)
+            (toNumber(sale.remainingSYP) ||
+              toNumber(sale.remainingUSD ?? sale.remainingDebt) *
+                toNumber(invoicePaymentExchangeRate))
           ).toFixed(3),
         );
 
@@ -434,8 +475,15 @@ export default function CustomerDetails() {
                         currency == "USD"
                           ? -amount
                           : -Number((amount / exchangeRate).toFixed(1)),
+                      amountUSD:
+                        currency == "USD"
+                          ? -amount
+                          : -Number((amount / exchangeRate).toFixed(1)),
+                      amountSYP: currency === "SYP" ? -amount : 0,
+                      amountOriginal: -amount,
                       note,
                       currency: currency,
+                      paymentCurrency: currency as "USD" | "SYP",
                       exchangeRate: exchangeRate,
                       amount_base: -amount,
                       paymentAccountId,
@@ -543,7 +591,10 @@ export default function CustomerDetails() {
                 <div className="rounded-md border p-3">
                   <p className="text-sm text-muted-foreground">إجمالي المتبقي</p>
                   <p className="text-xl font-bold text-destructive">
-                    {formatAmount(salesSummary.remainingDebt)}
+                    {formatDualCurrency(
+                      salesSummary.remainingDebt,
+                      salesSummary.remainingDebtSYP,
+                    )}
                   </p>
                 </div>
               </div>
@@ -599,15 +650,26 @@ export default function CustomerDetails() {
                         <div className="rounded-md border p-3 text-sm">
                           <div className="flex justify-between">
                             <span>إجمالي الفاتورة</span>
-                            <span>{formatAmount(row.totalPrice)}</span>
+                            <span>{formatDualCurrency(row.totalPrice, row.totalSYP)}</span>
                           </div>
+                          {shouldShowExchangeRate(row) && (
+                            <div className="flex justify-between">
+                              <span>سعر الصرف</span>
+                              <span>{formatExchangeRate(row.exchangeRate)}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between">
                             <span>المدفوع</span>
-                            <span>{formatAmount(row.paidAmount)}</span>
+                            <span>{formatDualCurrency(row.paidAmount, row.paidSYP)}</span>
                           </div>
                           <div className="flex justify-between font-bold text-destructive">
                             <span>المتبقي</span>
-                            <span>{formatAmount(row.remainingDebt)}</span>
+                            <span>
+                              {formatDualCurrency(
+                                row.remainingDebt,
+                                row.remainingSYP,
+                              )}
+                            </span>
                           </div>
                         </div>
 

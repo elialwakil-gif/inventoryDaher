@@ -1,24 +1,36 @@
 import { Text, View, StyleSheet } from "@react-pdf/renderer";
+import { formatExchangeRate, shouldShowExchangeRate } from "@/lib/money";
 
 export default function InvoicePdf({ sell }: { sell: any }) {
-  const toNumber = (value: unknown) => {
+  const toNumber = (value: unknown, fallback = 0) => {
     const numberValue = Number(value);
-    return Number.isFinite(numberValue) ? numberValue : 0;
+    return Number.isFinite(numberValue) ? numberValue : fallback;
   };
-  const productsTotal = Array.isArray(sell?.products)
+  const productsSubtotal = Array.isArray(sell?.products)
     ? sell.products.reduce(
         (sum: number, product: any) =>
           sum + toNumber(product?.qty) * toNumber(product?.sellPrice),
         0,
       )
     : 0;
-  const savedDiscount = toNumber(sell?.discount);
+  const productsTotal = toNumber(sell?.subtotalUSD, productsSubtotal) || productsSubtotal;
+  const savedDiscount = toNumber(sell?.discountUSD ?? sell?.discount);
   const inferredDiscount = Math.max(
     productsTotal - toNumber(sell?.totalPrice),
     0,
   );
   const discount = savedDiscount > 0 ? savedDiscount : inferredDiscount;
+  const discountPercent = toNumber(sell?.discountPercent);
+  const discountAmountUSD = toNumber(sell?.discountAmountUSD);
+  const discountDetails = [
+    discountPercent > 0 ? `${discountPercent.toFixed(2)}%` : "",
+    discountAmountUSD > 0 ? `${discountAmountUSD.toFixed(2)}` : "",
+  ]
+    .filter(Boolean)
+    .join(" + ");
   const totalPrice = toNumber(sell?.totalPrice);
+  const invoiceCurrency = sell?.paymentCurrency || sell?.currency || "USD";
+  const showExchangeRate = shouldShowExchangeRate({ currency: invoiceCurrency });
 
   return (
     <View style={styles.container}>
@@ -40,8 +52,17 @@ export default function InvoicePdf({ sell }: { sell: any }) {
 
         <View style={styles.infoRow}>
           <Text>:العملة</Text>
-          <Text style={styles.ltr}>{sell.currency}</Text>
+          <Text style={styles.ltr}>{invoiceCurrency}</Text>
         </View>
+
+        {showExchangeRate && (
+          <View style={styles.infoRow}>
+            <Text>:سعر الصرف</Text>
+            <Text style={styles.ltr}>
+              {formatExchangeRate(sell?.exchangeRate)}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.infoRow}>
           <Text>:رقم الفاتورة</Text>
@@ -88,7 +109,10 @@ export default function InvoicePdf({ sell }: { sell: any }) {
 
           <View style={styles.totalContainer}>
             <Text style={styles.totalLabel}>الحسم:</Text>
-            <Text style={styles.totalAmount}>{discount.toFixed(2)}</Text>
+            <Text style={styles.totalAmount}>
+              {discount.toFixed(2)}
+              {discountDetails ? ` (${discountDetails})` : ""}
+            </Text>
           </View>
         </>
       )}

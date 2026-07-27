@@ -5,10 +5,18 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import PopupForm from '@/components/ui/custom/PopupForm'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { Plus, Edit, Trash2 , Info } from 'lucide-react'
+import { Plus, Edit, Trash2 , Info, Database, RefreshCw } from 'lucide-react'
 import AddAccountForm from '@/components/Accounts/AddAccountForm'
 import UpdateAccountForm from '@/components/Accounts/UpdateAccountForm'
 import { useGetAccount, useDeleteAccount } from '@/hooks/useAccount'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useToast } from '@/hooks/use-toast'
+import {
+    previewCurrencyMigration,
+    runCurrencyMigration,
+    CurrencyMigrationSummary,
+} from '@/services/currencyMigration'
+import { queryKeys } from '@/lib/queryKeys'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -26,6 +34,48 @@ export default function ChartAccount() {
     const [isUpdateOpen, setIsUpdateOpen] = useState(false)
     const [selectedAccount, setSelectedAccount] = useState(null)
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
+
+    const formatMigrationSummary = (summary: CurrencyMigrationSummary) =>
+        `بيع ${summary.sells}، شراء ${summary.purchases}، دفعات ${summary.payments}، حسابات ${summary.accounts}، عملاء ${summary.customers}، موردون ${summary.suppliers}`;
+
+    const previewMigration = useMutation({
+        mutationFn: previewCurrencyMigration,
+        onSuccess: (summary) => {
+            toast({
+                title: 'معاينة الترحيل',
+                description: formatMigrationSummary(summary),
+            });
+        },
+        onError: (error: Error) => {
+            toast({
+                title: 'خطأ',
+                description: error.message,
+                variant: 'destructive',
+            });
+        },
+    });
+
+    const executeMigration = useMutation({
+        mutationFn: runCurrencyMigration,
+        onSuccess: (summary) => {
+            queryClient.invalidateQueries({ queryKey: ['financial-operations'] });
+            queryClient.invalidateQueries({ queryKey: ['profit-analysis'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.accounts });
+            toast({
+                title: 'تم ترحيل العملات',
+                description: formatMigrationSummary(summary),
+            });
+        },
+        onError: (error: Error) => {
+            toast({
+                title: 'خطأ',
+                description: error.message,
+                variant: 'destructive',
+            });
+        },
+    });
 
     const accountColumns = [
         { label: 'المعرف', key: 'id', hidden: true },
@@ -35,6 +85,8 @@ export default function ChartAccount() {
         { label: 'الفئة', key: 'category', sortable: true },
         { label: 'الرصيد الافتتاحي', key: 'openingBalance', sortable: true },
         { label: 'الرصيد الحالي', key: 'currentBalance', sortable: true },
+        { label: 'الرصيد USD', key: 'currentBalanceUSD', sortable: true },
+        { label: 'الرصيد SYP', key: 'currentBalanceSYP', sortable: true },
         { label: 'العملة', key: 'currency', sortable: true },
         { label: 'الوصف', key: 'description', sortable: true },
     ]
@@ -78,6 +130,29 @@ export default function ChartAccount() {
                             إدارة وتنظيم الحسابات
                         </p>
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                    <Button
+                        variant="outline"
+                        className="gap-2"
+                        disabled={previewMigration.isPending}
+                        onClick={() => previewMigration.mutate()}
+                    >
+                        <Database className="h-4 w-4" />
+                        معاينة ترحيل العملات
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        className="gap-2"
+                        disabled={executeMigration.isPending}
+                        onClick={() => {
+                            if (window.confirm('هل تريد تشغيل ترحيل العملات وتحديث البيانات القديمة؟')) {
+                                executeMigration.mutate();
+                            }
+                        }}
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                        تشغيل الترحيل
+                    </Button>
                     <PopupForm
                         isOpen={isOpen}
                         setIsOpen={setIsOpen}
@@ -91,6 +166,7 @@ export default function ChartAccount() {
                     >
                         <AddAccountForm />
                     </PopupForm>
+                    </div>
                 </div>
 
                 {/* نافذة تحديث الحساب */}

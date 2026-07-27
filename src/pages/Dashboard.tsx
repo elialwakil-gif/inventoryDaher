@@ -88,7 +88,7 @@ export default function Dashboard() {
           acc[day] = { income: 0, expense: 0 };
         }
 
-        const amount = Number(p.amount) || 0;
+        const amount = Number(p.amountUSD ?? p.amount) || 0;
 
         if (amount >= 0) {
           acc[day].income += amount; // قبض

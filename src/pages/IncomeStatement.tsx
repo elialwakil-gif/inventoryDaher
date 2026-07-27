@@ -215,7 +215,7 @@ export default function IncomeStatement() {
     const totals = new Map<string, number>();
 
     filteredSells.forEach((sell: any) => {
-      const currency = String(sell.currency || "غير محددة").toUpperCase();
+      const currency = String(sell.priceCurrency || "USD").toUpperCase();
       const totalCost = (sell.products || []).reduce(
         (sum: number, product: any) =>
           sum + Number(product.qty || 0) * Number(product.payPrice || 0),

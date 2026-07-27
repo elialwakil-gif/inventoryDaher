@@ -9,15 +9,15 @@ export const getBaseURL = () => {
     const inventoryUser = storedUser ? JSON.parse(storedUser) : null;
 
     return (
-      // "https://serverinventorydaherserver.onrender.com"
+      // "https://serverinventorydaherserver-b7gf.onrender.com"
       inventoryUser?.serverURL ||
       import.meta.env.VITE_API_BASE_URL ||
-      "https://serverinventorydaherserver.onrender.com"
+      "https://serverinventorydaherserver-b7gf.onrender.com"
     );
   } catch (error) {
     console.error("Failed to parse InventoryUser:", error);
     return (
-      import.meta.env.VITE_API_BASE_URL || "https://serverinventorydaherserver.onrender.com"
+      import.meta.env.VITE_API_BASE_URL || "https://serverinventorydaherserver-b7gf.onrender.com"
     );
   }
 };
@@ -54,6 +54,15 @@ apiClient.interceptors.request.use(
     }
 
     // 🔥 تحديث baseURL في كل طلب (لو تغير المستخدم)
+    if (inventoryUser?.role) {
+      config.headers["X-Inventory-Role"] = inventoryUser.role;
+    }
+
+    if (Array.isArray(inventoryUser?.permissions)) {
+      config.headers["X-Inventory-Permissions"] =
+        inventoryUser.permissions.join(",");
+    }
+
     config.baseURL = getBaseURL();
 
     return config;

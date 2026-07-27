@@ -10,6 +10,8 @@ interface AccountFormData {
     category: string;
     openingBalance?: number;
     currentBalance?: number;
+    currentBalanceUSD?: number;
+    currentBalanceSYP?: number;
     currency: string;
     description?: string;
 }

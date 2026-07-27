@@ -7,8 +7,21 @@ import {
 import { offlineCacheKeys } from "@/services/offlineSales";
 
 export default async function getAllProducts() {
+  return getProducts({ pricing: "full" });
+}
+
+export async function getProducts({
+  pricing = "full",
+}: {
+  pricing?: "full" | "table";
+} = {}) {
+  const cacheKey =
+    pricing === "table"
+      ? `${offlineCacheKeys.products}:table`
+      : offlineCacheKeys.products;
+
   if (!isBrowserOnline()) {
-    const cachedProducts = await getOfflineCache(offlineCacheKeys.products);
+    const cachedProducts = await getOfflineCache(cacheKey);
 
     if (cachedProducts) {
       return cachedProducts;
@@ -16,11 +29,13 @@ export default async function getAllProducts() {
   }
 
   try {
-    const response = await apiClient.get("/api/products");
-    await setOfflineCache(offlineCacheKeys.products, response.data);
+    const response = await apiClient.get("/api/products", {
+      params: { pricing },
+    });
+    await setOfflineCache(cacheKey, response.data);
     return response.data;
   } catch (err) {
-    const cachedProducts = await getOfflineCache(offlineCacheKeys.products);
+    const cachedProducts = await getOfflineCache(cacheKey);
 
     if (cachedProducts) {
       return cachedProducts;
@@ -42,6 +57,8 @@ export async function addProduct({
   category,
   warehouse,
   payPrice,
+  wholesalePrice,
+  superWholesalePrice,
   sellPrice,
   unit,
   quantity,
@@ -54,6 +71,8 @@ export async function addProduct({
       category,
       warehouse,
       payPrice,
+      wholesalePrice,
+      superWholesalePrice,
       sellPrice,
       unit,
       quantity,
@@ -89,7 +108,11 @@ export const deleteProduct = async (id: string) => {
 export const bulkUpdateProductPrices = async (data: {
   productIds: string[];
   percentageIncrease: number;
-  priceType: "sellPrice" | "payPrice";
+  priceType:
+    | "sellPrice"
+    | "payPrice"
+    | "wholesalePrice"
+    | "superWholesalePrice";
 }) => {
   try {
     const response = await apiClient.post("/api/products/bulk-update-prices", data);

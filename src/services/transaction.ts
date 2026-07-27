@@ -1,5 +1,12 @@
 import apiClient from "@/lib/axios";
 
+export type ProductPriceType =
+  | "payPrice"
+  | "wholesalePrice"
+  | "superWholesalePrice"
+  | "sellPrice"
+  | "custom";
+
 export interface sell {
   id?: string;
   customerId: string;
@@ -22,14 +29,36 @@ export interface sell {
     unit?: string;
     totalPrice?: number;
     payPrice?: number;
+    wholesalePrice?: number;
+    superWholesalePrice?: number;
     category?: string;
     updatedDate?: string;
     alertQuantity?: number;
+    selectedPriceType?: ProductPriceType;
   }[];
   date?: string;
   currency: string;
   exchangeRate: number;
   amount_base: number;
+  priceCurrency?: "USD";
+  paymentCurrency?: "USD" | "SYP";
+  subtotalUSD?: number;
+  totalUSD?: number;
+  totalSYP?: number;
+  totalOriginal?: number;
+  paidUSD?: number;
+  paidSYP?: number;
+  paidOriginal?: number;
+  remainingUSD?: number;
+  remainingSYP?: number;
+  remainingOriginal?: number;
+  discountType?: "none" | "amount" | "percent" | "mixed";
+  discountPercent?: number;
+  discountPercentUSD?: number;
+  discountAmountUSD?: number;
+  discountUSD?: number;
+  discountSYP?: number;
+  discountOriginal?: number;
   partValue: number;
   discount?: number;
   vehicleId?: string;
@@ -65,6 +94,8 @@ export interface Product {
   code: string;
   category: string;
   payPrice: number;
+  wholesalePrice?: number;
+  superWholesalePrice?: number;
   sellPrice: number;
   unit: string;
   quantity: number;
@@ -87,11 +118,38 @@ export interface purchase {
   currency: string;
   exchangeRate: number;
   amount_base: number;
+  priceCurrency?: "USD";
+  paymentCurrency?: "USD" | "SYP";
+  totalUSD?: number;
+  totalSYP?: number;
+  totalOriginal?: number;
+  paidUSD?: number;
+  paidSYP?: number;
+  paidOriginal?: number;
+  remainingUSD?: number;
+  remainingSYP?: number;
+  remainingOriginal?: number;
+  partValue?: number;
   remainingDebt: number;
   inventoryAccountId: string;
   payableAccountId: string;
   paymentAccountId?: string;
   date: string;
+  products?: Array<{
+    id?: string;
+    name: string;
+    code: string;
+    category?: string;
+    warehouse: string;
+    quantity: number;
+    payPrice: number;
+    wholesalePrice?: number;
+    superWholesalePrice?: number;
+    sellPrice: number;
+    unit?: string;
+    alertQuantity?: number;
+    lineTotal?: number;
+  }>;
 }
 
 export async function payNewProduct({
@@ -190,6 +248,10 @@ export async function payCustomerDebt(dataToSend: {
   currency: string;
   exchangeRate: number;
   amount_base: number;
+  amountUSD?: number;
+  amountSYP?: number;
+  amountOriginal?: number;
+  paymentCurrency?: "USD" | "SYP";
   paymentAccountId: string;
   receivableAccountId: string;
 }) {
@@ -199,8 +261,12 @@ export async function payCustomerDebt(dataToSend: {
         customerId: dataToSend.customerId,
         sellId: dataToSend.sellId,
         amount: Number(dataToSend.amount),
+        amountUSD: dataToSend.amountUSD,
+        amountSYP: dataToSend.amountSYP,
+        amountOriginal: dataToSend.amountOriginal,
         note: dataToSend.note,
         currency: dataToSend.currency,
+        paymentCurrency: dataToSend.paymentCurrency,
         exchangeRate: dataToSend.exchangeRate,
         amount_base: dataToSend.amount_base,
         paymentAccountId: dataToSend.paymentAccountId,
@@ -228,6 +294,10 @@ export async function paySupplierDebt(dataToSend: {
   currency: string;
   exchangeRate: number;
   amount_base: number;
+  amountUSD?: number;
+  amountSYP?: number;
+  amountOriginal?: number;
+  paymentCurrency?: "USD" | "SYP";
   paymentAccountId: string;
   payableAccountId: string;
 }) {
@@ -237,8 +307,12 @@ export async function paySupplierDebt(dataToSend: {
         supplierId: dataToSend.supplierId,
         purchaseId: dataToSend.purchaseId,
         amount: dataToSend.amount,
+        amountUSD: dataToSend.amountUSD,
+        amountSYP: dataToSend.amountSYP,
+        amountOriginal: dataToSend.amountOriginal,
         note: dataToSend.note,
         currency: dataToSend.currency,
+        paymentCurrency: dataToSend.paymentCurrency,
         exchangeRate: dataToSend.exchangeRate,
         amount_base: dataToSend.amount_base,
         paymentAccountId: dataToSend.paymentAccountId,

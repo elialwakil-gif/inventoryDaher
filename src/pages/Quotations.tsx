@@ -27,7 +27,7 @@ import {
   QuotationStatus,
   updateQuotation,
 } from "@/services/quotations";
-import type { Product } from "@/services/transaction";
+import type { Product, ProductPriceType } from "@/services/transaction";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, RotateCcw, Save, ShoppingCart } from "lucide-react";
@@ -35,7 +35,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-type SelectedProduct = Product & { qty: number };
+type SelectedProduct = Product & { qty: number; selectedPriceType?: ProductPriceType };
 
 const toNumber = (value: unknown) => {
   const numberValue = Number(value);
@@ -58,6 +58,7 @@ const createEmptyQuotationForm = () => ({
   temporaryCustomerName: "",
   products: [] as SelectedProduct[],
   discount: "",
+  discountPercent: "",
   currency: "USD",
   exchangeRate: 1,
   status: "draft" as QuotationStatus,
@@ -106,7 +107,12 @@ export default function Quotations() {
       ),
     [form.products],
   );
-  const discount = Math.max(toNumber(form.discount), 0);
+  const discountAmount = Math.max(toNumber(form.discount), 0);
+  const discountPercent = Math.max(toNumber(form.discountPercent), 0);
+  const discountPercentUSD = Number(
+    (subtotal * (discountPercent / 100)).toFixed(3),
+  );
+  const discount = Number((discountPercentUSD + discountAmount).toFixed(3));
   const totalPrice = Math.max(Number((subtotal - discount).toFixed(3)), 0);
   const customerName =
     selectedCustomer?.name || form.temporaryCustomerName.trim();
@@ -121,6 +127,17 @@ export default function Quotations() {
       products: form.products,
       subtotal,
       discount,
+      discountType:
+        discountPercent > 0 && discountAmount > 0
+          ? "mixed"
+          : discountPercent > 0
+            ? "percent"
+            : discountAmount > 0
+              ? "amount"
+              : "none",
+      discountPercent,
+      discountPercentUSD,
+      discountAmountUSD: discountAmount,
       totalPrice,
       currency: form.currency,
       exchangeRate: form.currency === "USD" ? 1 : toNumber(form.exchangeRate),
@@ -132,6 +149,9 @@ export default function Quotations() {
     [
       customerName,
       discount,
+      discountAmount,
+      discountPercent,
+      discountPercentUSD,
       editingQuotationId,
       form,
       selectedCustomer,
@@ -188,6 +208,9 @@ export default function Quotations() {
         product.payPrice === undefined ? undefined : toNumber(product.payPrice),
     })),
     discount,
+    discountPercent,
+    discountPercentUSD,
+    discountAmountUSD: discountAmount,
     currency: form.currency,
     exchangeRate: form.currency === "USD" ? 1 : toNumber(form.exchangeRate),
     status: form.status,
@@ -218,6 +241,21 @@ export default function Quotations() {
 
     if (totalPrice <= 0) {
       toast.error("مجموع العرض يجب أن يكون أكبر من صفر");
+      return false;
+    }
+
+    if (discountPercent < 0 || discountPercent > 100) {
+      toast.error("نسبة الحسم يجب أن تكون بين 0 و 100");
+      return false;
+    }
+
+    if (discountAmount < 0) {
+      toast.error("مبلغ الحسم لا يمكن أن يكون سالبا");
+      return false;
+    }
+
+    if (discount >= subtotal) {
+      toast.error("الحسم يجب أن يكون أقل من مجموع العرض");
       return false;
     }
 
@@ -272,7 +310,8 @@ export default function Quotations() {
         ? ""
         : quotation.customerName || "",
       products: quotation.products as SelectedProduct[],
-      discount: String(quotation.discount || ""),
+      discount: String((quotation.discountAmountUSD ?? quotation.discount) || ""),
+      discountPercent: String(quotation.discountPercent || ""),
       currency: quotation.currency || "USD",
       exchangeRate: quotation.currency === "USD" ? 1 : quotation.exchangeRate || 1,
       status: quotation.status || "draft",
@@ -293,6 +332,12 @@ export default function Quotations() {
         quotation: {
           ...quotation,
           discount: String(quotation.discount || ""),
+          discountAmountUSD:
+            quotation.discountAmountUSD === undefined ||
+            quotation.discountAmountUSD === null
+              ? quotation.discount
+              : quotation.discountAmountUSD,
+          discountPercent: quotation.discountPercent || 0,
         },
       },
     });
@@ -366,7 +411,20 @@ export default function Quotations() {
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <FormInput
-                  label="الحسم"
+                  label="حسم نسبة %"
+                  id="quotation-discount-percent"
+                  type="number"
+                  value={form.discountPercent}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      discountPercent: event.target.value,
+                    }))
+                  }
+                />
+
+                <FormInput
+                  label="حسم مبلغ"
                   id="quotation-discount"
                   type="number"
                   value={form.discount}

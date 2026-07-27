@@ -27,10 +27,22 @@ import PdfDocument from "@/components/pdf/PdfDocument";
 import InvoicePdf from "@/components/pdf/InvoicePdf";
 import CustomerDiscountForm from "@/components/Customers/CustomerDiscountForm";
 import { toast } from "sonner";
+import {
+  formatExchangeRate,
+  formatMoney as formatCurrencyAmount,
+  shouldShowExchangeRate,
+} from "@/lib/money";
 
-const toNumber = (value: unknown) => {
+const toNumber = (value: unknown, fallback = 0) => {
   const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? numberValue : 0;
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+};
+
+const formatDualCurrency = (usd: unknown, syp?: unknown) => {
+  const usdText = formatCurrencyAmount(toNumber(usd), "USD");
+  const sypAmount = toNumber(syp);
+
+  return sypAmount ? `${usdText} / ${formatCurrencyAmount(sypAmount, "SYP")}` : usdText;
 };
 
 export default function SellDetails() {
@@ -115,19 +127,36 @@ export default function SellDetails() {
     );
   }
 
-  const productsSubtotal = products.reduce(
+  const productsLineSubtotal = products.reduce(
     (sum, product) =>
       sum + toNumber(product?.sellPrice) * toNumber(product?.qty),
     0,
   );
-  const savedDiscount = toNumber(sell?.discount);
+  const productsSubtotal = toNumber(sell?.subtotalUSD, productsLineSubtotal) || productsLineSubtotal;
+  const savedDiscount = toNumber(sell?.discountUSD ?? sell?.discount);
   const inferredDiscount = Math.max(
     productsSubtotal - toNumber(sell?.totalPrice),
     0,
   );
   const invoiceDiscount =
     savedDiscount > 0 ? savedDiscount : inferredDiscount;
-  const invoiceTotal = toNumber(sell?.totalPrice);
+  const invoiceDiscountPercent = toNumber(sell?.discountPercent);
+  const invoiceDiscountAmountUSD = toNumber(sell?.discountAmountUSD);
+  const invoiceDiscountDetails = [
+    invoiceDiscountPercent > 0 ? `${invoiceDiscountPercent.toLocaleString()}%` : "",
+    invoiceDiscountAmountUSD > 0 ? invoiceDiscountAmountUSD.toLocaleString() : "",
+  ]
+    .filter(Boolean)
+    .join(" + ");
+  const invoiceTotal = toNumber(sell?.totalUSD ?? sell?.totalPrice);
+  const invoicePaid = toNumber(
+    sell?.paidUSD ?? Math.max(invoiceTotal - toNumber(sell?.remainingDebt), 0),
+  );
+  const invoiceRemaining = toNumber(sell?.remainingUSD ?? sell?.remainingDebt);
+  const invoiceCurrency = sell?.paymentCurrency || sell?.currency || "USD";
+  const showExchangeRate = shouldShowExchangeRate({
+    currency: invoiceCurrency,
+  });
 
   return (
     <DashboardLayout>
@@ -234,12 +263,14 @@ export default function SellDetails() {
               </div>
               <div>
                 <span className="text-muted-foreground">العملة:</span>
-                <p>{sell.currency || "غير محددة"}</p>
+                <p>{invoiceCurrency || "غير محددة"}</p>
               </div>
-              <div>
-                <span className="text-muted-foreground">سعر الصرف:</span>
-                <p>{sell.exchangeRate.toLocaleString()}</p>
-              </div>
+              {showExchangeRate && (
+                <div>
+                  <span className="text-muted-foreground">سعر الصرف:</span>
+                  <p>{formatExchangeRate(sell?.exchangeRate)}</p>
+                </div>
+              )}
               <div>
                 <span className="text-muted-foreground">حالة الدفع:</span>
                 <Badge
@@ -360,12 +391,13 @@ export default function SellDetails() {
               <span>الحسم:</span>
               <span className="font-medium">
                 {invoiceDiscount.toLocaleString()}{" "}
+                {invoiceDiscountDetails ? `(${invoiceDiscountDetails})` : ""}
               </span>
             </div>
             <div className="flex justify-between">
               <span>المدفوع:</span>
               <span className="font-medium">
-                {sell?.partValue?.toLocaleString()}
+                {formatDualCurrency(invoicePaid, sell?.paidSYP)}
               </span>
             </div>
             <Separator />
@@ -373,10 +405,10 @@ export default function SellDetails() {
               <span></span>
               <span
                 className={
-                  sell.remainingDebt > 0 ? "text-red-600" : "text-green-600"
+                  invoiceRemaining > 0 ? "text-red-600" : "text-green-600"
                 }
               >
-                {(invoiceTotal - toNumber(sell?.partValue)).toLocaleString()}
+                {formatDualCurrency(invoiceRemaining, sell?.remainingSYP)}
               </span>
             </div>
           </CardContent>

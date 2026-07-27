@@ -45,10 +45,13 @@ interface PurchaseRecord {
   name?: string;
   code?: string;
   totalPrice?: number | string;
+  totalUSD?: number | string;
+  totalOriginal?: number | string;
   amount_base?: number | string;
   paymentStatus?: string;
   remainingDebt?: number | string;
   currency?: string;
+  paymentCurrency?: string;
   date?: string;
 }
 
@@ -60,10 +63,13 @@ interface SellRecord {
   id?: string;
   customerId?: string;
   totalPrice?: number | string;
+  totalUSD?: number | string;
+  totalOriginal?: number | string;
   amount_base?: number | string;
   paymentStatus?: string;
   remainingDebt?: number | string;
   currency?: string;
+  paymentCurrency?: string;
   date?: string;
   products?: SellProduct[];
 }
@@ -106,6 +112,9 @@ interface FinancialOperation {
   description: string;
   partyName: string;
   amount: number;
+  amountUSD: number;
+  amountSYP: number;
+  amountDisplay: string;
   originalAmount: number;
   currency: string;
   effect: "داخل" | "خارج" | "ذمم" | "-";
@@ -123,7 +132,8 @@ const operationsColumns = [
   { label: "الأثر", key: "effect", sortable: true },
   { label: "الطرف", key: "partyName", sortable: true },
   { label: "الوصف", key: "description", sortable: true },
-  { label: "المبلغ", key: "amount", sortable: true },
+  { label: "المبلغ", key: "amountDisplay", sortable: true },
+  { label: "المبلغ الأصلي", key: "originalAmount", sortable: true },
   { label: "العملة", key: "currency", sortable: true },
   { label: "الحالة", key: "status", sortable: true },
   { label: "ملاحظات", key: "note", sortable: true },
@@ -139,6 +149,21 @@ const formatAmount = (value: number) =>
   value.toLocaleString("en-US", {
     maximumFractionDigits: 2,
   });
+
+const formatDualAmount = (usd: number, syp: number) =>
+  syp
+    ? `${formatAmount(usd)} USD / ${formatAmount(syp)} SYP`
+    : `${formatAmount(usd)} USD`;
+
+const formatDisplayAmount = (
+  usd: number,
+  syp: number,
+  mode: "dual" | "USD" | "SYP",
+) => {
+  if (mode === "USD") return `${formatAmount(usd)} USD`;
+  if (mode === "SYP") return `${formatAmount(syp)} SYP`;
+  return formatDualAmount(usd, syp);
+};
 
 const normalizeCurrency = (currency?: string) =>
   (currency || "USD").toUpperCase();
@@ -235,6 +260,9 @@ export default function FinancialStatement() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedCurrency, setSelectedCurrency] = useState<string>("all");
+  const [displayCurrency, setDisplayCurrency] = useState<"dual" | "USD" | "SYP">(
+    "dual",
+  );
 
   const { data, isLoading } = useQuery({
     queryKey: ["financial-operations"],
@@ -278,12 +306,11 @@ export default function FinancialStatement() {
 
   const operations = useMemo<FinancialOperation[]>(() => {
     const payments = (data?.payments || []).map((payment) => {
-      const currency = normalizeCurrency(payment.currency);
-      const amount = getOperationAmount(
-        payment.currency,
-        Math.abs(toNumber(payment.amount)),
-        Math.abs(toNumber(payment.amount_base)),
+      const currency = normalizeCurrency(
+        payment.paymentCurrency || payment.currency,
       );
+      const amount = Math.abs(toNumber(payment.amountUSD ?? payment.amount));
+      const amountSYP = Math.abs(toNumber(payment.amountSYP));
 
       return {
         id: payment.id || `payment-${payment.date || payment.amount}`,
@@ -299,7 +326,12 @@ export default function FinancialStatement() {
           suppliersMap,
         }),
         amount,
-        originalAmount: Math.abs(toNumber(payment.amount)),
+        amountUSD: amount,
+        amountSYP,
+        amountDisplay: "",
+        originalAmount: Math.abs(
+          toNumber(payment.amountOriginal ?? payment.amount_base ?? payment.amount),
+        ),
         currency,
         effect:
           payment.type === "income"
@@ -315,12 +347,11 @@ export default function FinancialStatement() {
     });
 
     const purchases = (data?.purchases || []).map((purchase) => {
-      const currency = normalizeCurrency(purchase.currency);
-      const amount = getOperationAmount(
-        purchase.currency,
-        purchase.totalPrice,
-        purchase.amount_base,
+      const currency = normalizeCurrency(
+        purchase.paymentCurrency || purchase.currency,
       );
+      const amount = toNumber(purchase.totalUSD ?? purchase.totalPrice);
+      const amountSYP = toNumber(purchase.totalSYP);
       const status = getStatusLabel(purchase.paymentStatus);
 
       return {
@@ -336,7 +367,12 @@ export default function FinancialStatement() {
           suppliersMap,
         }),
         amount,
-        originalAmount: toNumber(purchase.totalPrice),
+        amountUSD: amount,
+        amountSYP,
+        amountDisplay: "",
+        originalAmount: toNumber(
+          purchase.totalOriginal ?? purchase.amount_base ?? purchase.totalPrice,
+        ),
         currency,
         effect: purchase.paymentStatus === "cash" ? "خارج" : "ذمم",
         date: purchase.date || "",
@@ -350,8 +386,9 @@ export default function FinancialStatement() {
     });
 
     const sells = (data?.sells || []).map((sell) => {
-      const currency = normalizeCurrency(sell.currency);
-      const amount = getOperationAmount(sell.currency, sell.totalPrice, sell.amount_base);
+      const currency = normalizeCurrency(sell.paymentCurrency || sell.currency);
+      const amount = toNumber(sell.totalUSD ?? sell.totalPrice);
+      const amountSYP = toNumber(sell.totalSYP);
       const status = getStatusLabel(sell.paymentStatus);
 
       return {
@@ -373,7 +410,12 @@ export default function FinancialStatement() {
           suppliersMap,
         }),
         amount,
-        originalAmount: toNumber(sell.totalPrice),
+        amountUSD: amount,
+        amountSYP,
+        amountDisplay: "",
+        originalAmount: toNumber(
+          sell.totalOriginal ?? sell.amount_base ?? sell.totalPrice,
+        ),
         currency,
         effect: sell.paymentStatus === "cash" ? "داخل" : "ذمم",
         date: sell.date || "",
@@ -395,6 +437,10 @@ export default function FinancialStatement() {
         item.returnValue ?? item.totalPrice,
         item.amount_base,
       );
+      const amountSYP =
+        currency === "SYP"
+          ? Math.abs(toNumber(item.amountSYP ?? item.amount_base ?? item.returnValue ?? item.totalPrice))
+          : 0;
       const partyName = supplierReturn
         ? item.supplierName ||
           getPartyName({
@@ -425,6 +471,9 @@ export default function FinancialStatement() {
         }`.trim(),
         partyName,
         amount,
+        amountUSD: amount,
+        amountSYP,
+        amountDisplay: "",
         originalAmount: toNumber(item.returnValue ?? item.totalPrice),
         currency,
         effect: supplierReturn ? "داخل" : "خارج",
@@ -481,11 +530,31 @@ export default function FinancialStatement() {
 
   const operationsCount = filteredOperations.length;
 
+  const displayedOperations = useMemo(
+    () =>
+      filteredOperations.map((operation) => ({
+        ...operation,
+        amountDisplay: formatDisplayAmount(
+          operation.amountUSD,
+          operation.amountSYP,
+          displayCurrency,
+        ),
+      })),
+    [displayCurrency, filteredOperations],
+  );
+
   const purchasesTotal = useMemo(
     () =>
       filteredOperations
         .filter((operation) => operation.operationType === "purchase")
         .reduce((sum, operation) => sum + operation.amount, 0),
+    [filteredOperations],
+  );
+  const purchasesTotalSYP = useMemo(
+    () =>
+      filteredOperations
+        .filter((operation) => operation.operationType === "purchase")
+        .reduce((sum, operation) => sum + operation.amountSYP, 0),
     [filteredOperations],
   );
 
@@ -496,6 +565,13 @@ export default function FinancialStatement() {
         .reduce((sum, operation) => sum + operation.amount, 0),
     [filteredOperations],
   );
+  const sellsTotalSYP = useMemo(
+    () =>
+      filteredOperations
+        .filter((operation) => operation.operationType === "sell")
+        .reduce((sum, operation) => sum + operation.amountSYP, 0),
+    [filteredOperations],
+  );
 
   const returnsTotal = useMemo(
     () =>
@@ -504,24 +580,50 @@ export default function FinancialStatement() {
         .reduce((sum, operation) => sum + operation.amount, 0),
     [filteredOperations],
   );
+  const returnsTotalSYP = useMemo(
+    () =>
+      filteredOperations
+        .filter((operation) => operation.operationType === "return")
+        .reduce((sum, operation) => sum + operation.amountSYP, 0),
+    [filteredOperations],
+  );
 
   const cashInTotal = useMemo(
     () =>
       filteredOperations
+        .filter((operation) => operation.operationType === "payment")
         .filter((operation) => operation.effect === "داخل")
         .reduce((sum, operation) => sum + operation.amount, 0),
+    [filteredOperations],
+  );
+  const cashInTotalSYP = useMemo(
+    () =>
+      filteredOperations
+        .filter((operation) => operation.operationType === "payment")
+        .filter((operation) => operation.effect === "داخل")
+        .reduce((sum, operation) => sum + operation.amountSYP, 0),
     [filteredOperations],
   );
 
   const cashOutTotal = useMemo(
     () =>
       filteredOperations
+        .filter((operation) => operation.operationType === "payment")
         .filter((operation) => operation.effect === "خارج")
         .reduce((sum, operation) => sum + operation.amount, 0),
     [filteredOperations],
   );
+  const cashOutTotalSYP = useMemo(
+    () =>
+      filteredOperations
+        .filter((operation) => operation.operationType === "payment")
+        .filter((operation) => operation.effect === "خارج")
+        .reduce((sum, operation) => sum + operation.amountSYP, 0),
+    [filteredOperations],
+  );
 
   const netCashMovement = cashInTotal - cashOutTotal;
+  const netCashMovementSYP = cashInTotalSYP - cashOutTotalSYP;
 
   return (
     <DashboardLayout>
@@ -537,32 +639,32 @@ export default function FinancialStatement() {
             />
             <StatsCard
               title="إجمالي المبيعات"
-              value={formatAmount(sellsTotal)}
+              value={formatDualAmount(sellsTotal, sellsTotalSYP)}
               icon={Wallet}
             />
             <StatsCard
               title="إجمالي المشتريات"
-              value={formatAmount(purchasesTotal)}
+              value={formatDualAmount(purchasesTotal, purchasesTotalSYP)}
               icon={ShoppingCart}
             />
             <StatsCard
               title="إجمالي المرتجعات"
-              value={formatAmount(returnsTotal)}
+              value={formatDualAmount(returnsTotal, returnsTotalSYP)}
               icon={RotateCcw}
             />
             <StatsCard
               title="الداخل"
-              value={formatAmount(cashInTotal)}
+              value={formatDualAmount(cashInTotal, cashInTotalSYP)}
               icon={ArrowUpCircle}
             />
             <StatsCard
               title="الخارج"
-              value={formatAmount(cashOutTotal)}
+              value={formatDualAmount(cashOutTotal, cashOutTotalSYP)}
               icon={ArrowDownCircle}
             />
             <StatsCard
               title="صافي الحركة"
-              value={formatAmount(netCashMovement)}
+              value={formatDualAmount(netCashMovement, netCashMovementSYP)}
               icon={ReceiptText}
               description={netCashMovement >= 0 ? "فائض حركة" : "عجز حركة"}
             />
@@ -607,6 +709,22 @@ export default function FinancialStatement() {
                 </SelectContent>
               </Select>
 
+              <Select
+                value={displayCurrency}
+                onValueChange={(value) =>
+                  setDisplayCurrency(value as "dual" | "USD" | "SYP")
+                }
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="طريقة العرض" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dual">USD / SYP</SelectItem>
+                  <SelectItem value="USD">USD فقط</SelectItem>
+                  <SelectItem value="SYP">SYP فقط</SelectItem>
+                </SelectContent>
+              </Select>
+
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -645,6 +763,7 @@ export default function FinancialStatement() {
                   setDateRange(undefined);
                   setSelectedType("all");
                   setSelectedCurrency("all");
+                  setDisplayCurrency("dual");
                 }}
               >
                 مسح الفلاتر
@@ -656,7 +775,7 @@ export default function FinancialStatement() {
             <DataTable
               title=""
               columns={operationsColumns}
-              data={filteredOperations}
+              data={displayedOperations}
               isLoading={isLoading}
               defaultPageSize={10}
               pageSizeOptions={[10, 20, 50]}

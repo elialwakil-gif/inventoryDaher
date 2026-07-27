@@ -3,7 +3,7 @@ import PopupForm from "../ui/custom/PopupForm";
 import { Button } from "../ui/button";
 import FormInput from "../ui/custom/FormInput";
 import { Checkbox } from "../ui/checkbox";
-import { Product } from "@/services/transaction";
+import { Product, ProductPriceType } from "@/services/transaction";
 import { ProductTableRow } from "@/pages/Products";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { bulkUpdateProductPrices } from "@/services/products";
@@ -35,7 +35,7 @@ export default function BulkPriceIncreaseForm({
     new Set()
   );
   const [percentageIncrease, setPercentageIncrease] = useState<number>(0);
-  const [priceType, setPriceType] = useState<"sellPrice" | "payPrice">(
+  const [priceType, setPriceType] = useState<Exclude<ProductPriceType, "custom">>(
     "sellPrice"
   );
   const [selectAll, setSelectAll] = useState(false);
@@ -46,7 +46,7 @@ export default function BulkPriceIncreaseForm({
     mutationFn: (data: {
       productIds: string[];
       percentageIncrease: number;
-      priceType: "sellPrice" | "payPrice";
+      priceType: Exclude<ProductPriceType, "custom">;
     }) => bulkUpdateProductPrices(data),
     onSuccess: () => {
       toast.success("تم تحديث الأسعار بنجاح");
@@ -124,6 +124,8 @@ export default function BulkPriceIncreaseForm({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="sellPrice">سعر المبيع</SelectItem>
+              <SelectItem value="wholesalePrice">سعر الجملة</SelectItem>
+              <SelectItem value="superWholesalePrice">سعر جملة الجملة</SelectItem>
               <SelectItem value="payPrice">سعر الشراء</SelectItem>
             </SelectContent>
           </Select>
@@ -170,9 +172,7 @@ export default function BulkPriceIncreaseForm({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{product.name}</p>
                     <p className="text-xs text-gray-500">
-                      {priceType === "sellPrice"
-                        ? `السعر الحالي: ${product.sellPrice}`
-                        : `السعر الحالي: ${product.payPrice}`}
+                      السعر الحالي: {product[priceType] ?? "-"}
                     </p>
                   </div>
                 </div>

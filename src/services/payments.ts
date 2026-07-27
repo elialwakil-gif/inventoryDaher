@@ -14,6 +14,10 @@ export interface Payment {
   exchangeRate: number,
   amount_base: number,
   amount: number,
+  paymentCurrency?: "USD" | "SYP",
+  amountUSD?: number,
+  amountSYP?: number,
+  amountOriginal?: number,
   date?: string,
   note: string
 }

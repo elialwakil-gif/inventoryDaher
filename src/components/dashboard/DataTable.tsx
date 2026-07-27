@@ -82,9 +82,18 @@ export function DataTable({
     setInventoryUser(temUser);
   }, []);
 
+  const searchableColumns = columns.filter(
+    (column) =>
+      !column.hidden &&
+      !(column.onlyAdmin && inventoryUser?.role !== "admin"),
+  );
+
   const filteredData = data.filter((item) =>
-    Object.values(item).some((value) =>
-      value?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+    searchableColumns.some((column) =>
+      item[column.key]
+        ?.toString()
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()),
     ),
   );
 

@@ -22,7 +22,9 @@ export interface ProductTableRow {
   availableQuantity?: number;
   warehouse: string;
   payPrice?: number;
-  sellPrice: number;
+  wholesalePrice?: number;
+  superWholesalePrice?: number;
+  sellPrice?: number;
   category: string;
   unit: string;
   alertQuantity?: number;
@@ -45,6 +47,13 @@ export default function Products() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
 
   const { data: products = [], isLoading: productsLoading } = useProductContext();
+  const isAdmin = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem("InventoryUser") || "null")?.role === "admin";
+    } catch {
+      return false;
+    }
+  }, []);
   
 
   // =======================
@@ -75,9 +84,13 @@ export default function Products() {
       rows = rows.filter((p) => p.quantity <= getProductAlertLimit(p));
     }
 
-    rows = rows.filter(
-      (p) => p.sellPrice >= priceRange[0] && p.sellPrice <= priceRange[1],
-    );
+    if (isAdmin) {
+      rows = rows.filter(
+        (p) =>
+          Number(p.sellPrice || 0) >= priceRange[0] &&
+          Number(p.sellPrice || 0) <= priceRange[1],
+      );
+    }
 
     return rows.map((product) => ({
       ...product,
@@ -95,6 +108,7 @@ export default function Products() {
     stockFilter,
     onlyLowStock,
     priceRange,
+    isAdmin,
   ]);
 
   const totalProductsBalance = filteredData.reduce(
@@ -159,6 +173,7 @@ export default function Products() {
               المخزون الحرج فقط
             </label> */}
 
+            {isAdmin && (
             <div className="flex w-full items-center gap-2">
               <span>السعر:</span>
               <FormInput
@@ -183,6 +198,7 @@ export default function Products() {
                 placeholder="max"
               />
             </div>
+            )}
 
             <Button
               variant="outline"
