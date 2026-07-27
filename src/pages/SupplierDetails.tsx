@@ -70,7 +70,10 @@ const getSupplierPaymentMovementLabel = (payment: any) => {
 export default function SupplierDetails() {
   const navigate = useNavigate();
   const location = useLocation();
-  const supplierId = location.state;
+  const supplierState = location.state as { id?: string } | string | null;
+  const supplierId =
+    typeof supplierState === "string" ? { id: supplierState } : supplierState;
+  const supplierIdValue = supplierId?.id || "";
 
   const [isOpen, setIsOpen] = useState(false);
   const [isOpenTo, setIsOpenTo] = useState(false);
@@ -99,9 +102,9 @@ export default function SupplierDetails() {
   const [supplier, setSupplier] = useState<any>({});
 
   const { data, isLoading } = useQuery({
-    queryKey: ["supplier-details", supplierId],
-    queryFn: () => getSupplierById(supplierId),
-    enabled: !!supplierId,
+    queryKey: ["supplier-details", supplierIdValue],
+    queryFn: () => getSupplierById({ id: supplierIdValue }),
+    enabled: !!supplierIdValue,
   });
 
   useEffect(() => {
@@ -347,7 +350,7 @@ export default function SupplierDetails() {
   );
 
   const getCurrentSupplierId = () =>
-    String(supplier?.id || supplierId?.id || supplierId || "");
+    String(supplier?.id || supplierIdValue || "");
 
   const getPaymentAmountInBaseCurrency = (
     rawAmount: number,
@@ -539,6 +542,25 @@ export default function SupplierDetails() {
       );
     }
   };
+
+  if (!supplierIdValue) {
+    return (
+      <DashboardLayout>
+        <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center text-center" dir="rtl">
+          <Card className="w-full p-6">
+            <CardTitle className="mb-3">تعذر فتح بيانات المورد</CardTitle>
+            <p className="mb-4 text-sm text-muted-foreground">
+              يرجى اختيار المورد من جدول الموردين حتى يتم تحميل حسابه وعملياته.
+            </p>
+            <Button onClick={() => navigate("/suppliers")} variant="outline">
+              <ArrowLeft className="ml-2 h-4 w-4" />
+              الرجوع إلى الموردين
+            </Button>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

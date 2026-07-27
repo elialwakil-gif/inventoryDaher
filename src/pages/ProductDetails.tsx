@@ -14,15 +14,16 @@ import { toast } from "sonner"
 
 export default function ProductDetails() {
   const location = useLocation()
-  const productState = location.state
+  const productState = location.state as Record<string, any> | null
+  const productId = productState?.id
   const navigate = useNavigate()
   const queryClient = useQueryClient();
 
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["product", productState.id],
-    queryFn: () => getProductById(productState.id),
-    enabled: !!productState.id,
+    queryKey: ["product", productId],
+    queryFn: () => getProductById(productId as string),
+    enabled: !!productId,
   })
 
   useEffect(() => {
@@ -42,7 +43,10 @@ export default function ProductDetails() {
   }, [productState])
 
   const mutation = useMutation({
-    mutationFn: (newData: any) => updateProduct(productState.id, newData),
+    mutationFn: (newData: any) => {
+      if (!productId) throw new Error("Product id is required");
+      return updateProduct(productId, newData);
+    },
     onSuccess: () => {
       toast.success("✅ تم حفظ التعديلات بنجاح")
       setIsDirty(false)
@@ -188,6 +192,25 @@ const transfersColumns = [
     })
   }
 
+  if (!productId) {
+    return (
+      <DashboardLayout>
+        <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center gap-4 text-center" dir="rtl">
+          <Card className="w-full p-6">
+            <CardTitle className="mb-3">تعذر فتح تفاصيل المنتج</CardTitle>
+            <p className="mb-4 text-sm text-muted-foreground">
+              يرجى اختيار المنتج من جدول المنتجات حتى يتم تحميل بياناته بشكل صحيح.
+            </p>
+            <Button onClick={() => navigate("/Products")} variant="outline">
+              <ArrowLeft className="ml-2 h-4 w-4" />
+              الرجوع إلى المنتجات
+            </Button>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   if (isLoading){
     return <DashboardLayout>
       <Loading/>
@@ -273,7 +296,7 @@ const transfersColumns = [
                 variant="destructive"
                 onClick={() =>
                   window.confirm("هل انت متأكد من عملية الحذف")
-                    ? deleteMutation.mutate(productState.id)
+                    ? deleteMutation.mutate(productId)
                     : {}
                 }
               >

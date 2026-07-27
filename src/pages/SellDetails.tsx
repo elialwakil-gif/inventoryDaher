@@ -48,7 +48,7 @@ const formatDualCurrency = (usd: unknown, syp?: unknown) => {
 export default function SellDetails() {
   const location = useLocation();
   const navigate = useNavigate();
-  const id = location.state as string;
+  const id = typeof location.state === "string" ? location.state : "";
   const queryClient = useQueryClient();
 
   const { data: sell, isLoading } = useQuery({
@@ -67,7 +67,10 @@ export default function SellDetails() {
   }
 
   const updateSellMutation = useMutation({
-    mutationFn: (data: any) => updateSellById(id, data),
+    mutationFn: (data: any) => {
+      if (!id) throw new Error("Sell id is required");
+      return updateSellById(id, data);
+    },
     onSuccess: () => {
       toast.success("تم تحديث الفاتورة بنجاح");
       queryClient.invalidateQueries({ queryKey: ["customer-details", sell.customerId] });
@@ -80,7 +83,10 @@ export default function SellDetails() {
   });
   
   const deleteSellMutation = useMutation({
-    mutationFn: (data: any) => deleteSellById(id, data),
+    mutationFn: (data: any) => {
+      if (!id) throw new Error("Sell id is required");
+      return deleteSellById(id, data);
+    },
     onSuccess: () => {
       toast.success("تم حذف الفاتورة بنجاح");
       queryClient.invalidateQueries({
@@ -117,11 +123,49 @@ export default function SellDetails() {
     });
   };
 
-  if (isLoading || !sell) {
+  if (!id) {
+    return (
+      <DashboardLayout>
+        <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center text-center" dir="rtl">
+          <Card className="w-full p-6">
+            <CardTitle className="mb-3">تعذر فتح تفاصيل الفاتورة</CardTitle>
+            <p className="mb-4 text-sm text-muted-foreground">
+              يرجى اختيار الفاتورة من صفحة الزبون حتى يتم تحميل بياناتها بشكل صحيح.
+            </p>
+            <Button onClick={() => navigate("/customers")} variant="outline">
+              <ArrowLeft className="ml-2 h-4 w-4" />
+              الرجوع إلى الزبائن
+            </Button>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (isLoading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-[60vh]">
           <Loader2 className="animate-spin w-8 h-8 text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!sell) {
+    return (
+      <DashboardLayout>
+        <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center text-center" dir="rtl">
+          <Card className="w-full p-6">
+            <CardTitle className="mb-3">لم يتم العثور على الفاتورة</CardTitle>
+            <p className="mb-4 text-sm text-muted-foreground">
+              قد تكون الفاتورة محذوفة أو غير متاحة حاليا.
+            </p>
+            <Button onClick={() => navigate("/customers")} variant="outline">
+              <ArrowLeft className="ml-2 h-4 w-4" />
+              الرجوع إلى الزبائن
+            </Button>
+          </Card>
         </div>
       </DashboardLayout>
     );

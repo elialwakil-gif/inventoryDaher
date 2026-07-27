@@ -33,12 +33,16 @@ export default function AccountSelect({
   const { data: accounts = [] } = useGetAccount();
 
   const filteredAccounts = accounts.filter((acc: any) => {
+    if (acc.isActive === false) {
+      return false;
+    }
+
     if (filterType === "inventory") {
-      return acc.category === "Inventory" || acc.type === "Asset";
+      return acc.category === "Inventory";
     }
 
     if (filterType === "payable") {
-      return acc.category === "AccountsPayable" || acc.type === "Liability";
+      return acc.category === "AccountsPayable";
     }
 
     if (filterType === "payment") {
@@ -50,11 +54,20 @@ export default function AccountSelect({
     }
 
     if (filterType === "sales") {
-      return acc.type === "Revenue" || acc.category === "Revenue";
+      return (
+        acc.type === "Revenue" ||
+        acc.category === "Revenue" ||
+        acc.category === "SalesRevenue"
+      );
     }
 
     if (filterType === "expense") {
-      return acc.type === "Expense" || acc.category === "Expense";
+      return (
+        acc.type === "Expense" ||
+        acc.category === "Expense" ||
+        acc.category === "OperatingExpense" ||
+        acc.category === "CostOfGoodsSold"
+      );
     }
 
     return true;

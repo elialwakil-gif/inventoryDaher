@@ -72,7 +72,10 @@ const getPaymentMovementLabel = (payment: any) => {
 export default function CustomerDetails() {
   const navigate = useNavigate();
   const location = useLocation();
-  const customerId = location.state;
+  const customerState = location.state as { id?: string } | string | null;
+  const customerId =
+    typeof customerState === "string" ? { id: customerState } : customerState;
+  const customerIdValue = customerId?.id || "";
   const [isOpenTo, setIsOpenTo] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState(0);
@@ -156,9 +159,9 @@ export default function CustomerDetails() {
   const [customer, setCustomer] = useState<any>({});
 
   const { data, isLoading } = useQuery({
-    queryKey: ["customer-details", customerId],
-    queryFn: () => getCustomerById(customerId),
-    enabled: !!customerId,
+    queryKey: ["customer-details", customerIdValue],
+    queryFn: () => getCustomerById({ id: customerIdValue }),
+    enabled: !!customerIdValue,
   });
 
   useEffect(() => {
@@ -321,7 +324,7 @@ export default function CustomerDetails() {
   );
 
   const getCurrentCustomerId = () =>
-    String(customer?.id || customerId?.id || customerId || "");
+    String(customer?.id || customerIdValue || "");
 
   const openInvoicePayment = (sale: any) => {
     const nextCurrency = sale.paymentCurrency || sale.currency || "USD";
@@ -403,6 +406,25 @@ export default function CustomerDetails() {
           ).toFixed(3),
         );
 
+  if (!customerIdValue) {
+    return (
+      <DashboardLayout>
+        <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center text-center" dir="rtl">
+          <Card className="w-full p-6">
+            <CardTitle className="mb-3">تعذر فتح بيانات الزبون</CardTitle>
+            <p className="mb-4 text-sm text-muted-foreground">
+              يرجى اختيار الزبون من جدول الزبائن حتى يتم تحميل حسابه وعملياته.
+            </p>
+            <Button onClick={() => navigate("/customers")} variant="outline">
+              <ArrowLeft className="ml-2 h-4 w-4" />
+              الرجوع إلى الزبائن
+            </Button>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6" dir="rtl">
@@ -480,7 +502,7 @@ export default function CustomerDetails() {
                       return;
                     }
                     payCustomerDebtMutation.mutate({
-                      customerId: customerId.id,
+                      customerId: getCurrentCustomerId(),
                       amount:
                         currency == "USD"
                           ? -amount
