@@ -333,17 +333,24 @@ export async function paySupplierDebt(dataToSend: {
 }
 
 export async function handleCustomerReturn(newReturn: {
-  productCode: string;
+  productCode?: string;
   productName?: string;
   customerName?: string;
   customerId: string;
-  warehouse: string;
-  qty: number;
-  returnValue: number;
+  warehouse?: string;
+  qty?: number;
+  returnValue?: number;
   referenceId: string;
   returnType: "debt" | "cash" | "part";
   partValue: number;
-  productId: string;
+  productId?: string;
+  products?: Array<{
+    productCode?: string;
+    code?: string;
+    productId?: string;
+    warehouse: string;
+    qty: number;
+  }>;
   reason: string;
   paymentAccountId?: string;
   receivableAccountId?: string;
@@ -353,6 +360,7 @@ export async function handleCustomerReturn(newReturn: {
     const response = await apiClient.post("/api/transactions/CustomerReturn", {
       newReturn: {
         productCode: newReturn.productCode,
+        products: newReturn.products,
         productName: newReturn.productName,
         customerName: newReturn.customerName,
         customerId: newReturn.customerId,

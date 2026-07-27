@@ -121,18 +121,28 @@ export default function CustomerDetails() {
 
   const returnMutation = useMutation({
     mutationFn: (dataToSend: {
-      productCode: string;
+      productCode?: string;
       productName?: string;
       customerName?: string;
       customerId: string;
-      warehouse: string;
-      qty: number;
-      returnValue: number;
+      warehouse?: string;
+      qty?: number;
+      returnValue?: number;
       referenceId: string;
       returnType: "cash" | "debt" | "part";
       partValue: number;
-      productId: string;
+      productId?: string;
+      products?: Array<{
+        productCode?: string;
+        code?: string;
+        productId?: string;
+        warehouse: string;
+        qty: number;
+      }>;
       reason: string;
+      paymentAccountId?: string;
+      receivableAccountId?: string;
+      salesAccountId?: string;
     }) => handleCustomerReturn(dataToSend),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customer-details"] });
@@ -831,12 +841,33 @@ export default function CustomerDetails() {
                             return;
                           }
 
+                          if (
+                            isDebt === "part" &&
+                            (partValue <= 0 || partValue >= totalReturnValue)
+                          ) {
+                            toast.error("قيمة الدفع الجزئي يجب أن تكون أكبر من صفر وأقل من قيمة الإرجاع");
+                            return;
+                          }
+
                           try {
-                            await Promise.all(
-                              productsToReturn.map((prod) =>
-                                returnMutation.mutateAsync(prod),
-                              ),
-                            );
+                            await returnMutation.mutateAsync({
+                              customerId: row.customerId,
+                              customerName: customer.name,
+                              referenceId: row.id,
+                              returnValue: totalReturnValue,
+                              partValue,
+                              returnType: isDebt,
+                              reason,
+                              paymentAccountId,
+                              receivableAccountId,
+                              salesAccountId,
+                              products: productsToReturn.map((prod) => ({
+                                productId: prod.productId,
+                                productCode: prod.productCode,
+                                warehouse: prod.warehouse,
+                                qty: prod.qty,
+                              })),
+                            });
                             toast.success("تم تسجيل الإرجاع بنجاح!");
                             setOpenReturnId(null);
                             setReturnAmounts({});
