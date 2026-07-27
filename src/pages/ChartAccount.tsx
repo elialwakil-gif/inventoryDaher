@@ -131,7 +131,7 @@ export default function ChartAccount() {
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                    <Button
+                    {/* <Button
                         variant="outline"
                         className="gap-2"
                         disabled={previewMigration.isPending}
@@ -152,7 +152,7 @@ export default function ChartAccount() {
                     >
                         <RefreshCw className="h-4 w-4" />
                         تشغيل الترحيل
-                    </Button>
+                    </Button> */}
                     <PopupForm
                         isOpen={isOpen}
                         setIsOpen={setIsOpen}
