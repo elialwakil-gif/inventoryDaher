@@ -46,6 +46,10 @@ const formatMoney = (value: unknown) =>
 const getAvailableQuantity = (product: Product) =>
   Math.max(toNumber(product.quantity) - toNumber(product.reservedQuantity), 0);
 
+const normalizeWarehouseName = (value: unknown) => String(value || "").trim();
+const matchesSearch = (value: unknown, search: string) =>
+  String(value || "").toLowerCase().includes(search);
+
 export default function Vehicles() {
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -103,12 +107,16 @@ export default function Vehicles() {
     if (!sourceWarehouse || !search) return [];
 
     return products
-      .filter((product) => product.warehouse === sourceWarehouse)
+      .filter(
+        (product) =>
+          normalizeWarehouseName(product.warehouse) ===
+          normalizeWarehouseName(sourceWarehouse),
+      )
       .filter((product) => getAvailableQuantity(product) > 0)
       .filter(
         (product) =>
-          product.name?.toLowerCase().includes(search) ||
-          product.code?.toLowerCase().includes(search),
+          matchesSearch(product.name, search) ||
+          matchesSearch(product.code, search),
       )
       .slice(0, 12);
   }, [loadSearch, products, sourceWarehouse]);
