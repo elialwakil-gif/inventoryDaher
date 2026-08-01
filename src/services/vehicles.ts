@@ -25,6 +25,11 @@ export interface VehicleSummary {
   totals: VehicleTotals;
 }
 
+export interface DriverVehiclesDashboard {
+  data: VehicleSummary | null;
+  vehicles: VehicleSummary[];
+}
+
 export interface CreateVehiclePayload {
   name: string;
   location?: string;
@@ -36,8 +41,9 @@ export interface CreateVehiclePayload {
   defaultSalesAccountId?: string;
 }
 
-export interface UpdateVehiclePayload
-  extends Partial<Omit<CreateVehiclePayload, "name">> {
+export interface UpdateVehiclePayload extends Partial<
+  Omit<CreateVehiclePayload, "name">
+> {
   isActive?: boolean;
 }
 
@@ -58,8 +64,29 @@ const normalizeVehicleSummaries = (data: any): VehicleSummary[] => {
   return [];
 };
 
-const extractVehicleSummary = (data: any): VehicleSummary | null =>
-  data?.data || data?.vehicle || data || null;
+const extractVehicleSummary = (data: any): VehicleSummary | null => {
+  if (!data) return null;
+  if (data.data) return data.data;
+  if (data.vehicle && Array.isArray(data.products)) return data;
+  if (data.vehicle?.vehicle) return data.vehicle;
+  return null;
+};
+
+const normalizeDriverVehiclesDashboard = (
+  data: any,
+): DriverVehiclesDashboard => {
+  const selectedVehicle = extractVehicleSummary(data);
+  const vehicles = Array.isArray(data?.vehicles)
+    ? data.vehicles
+    : selectedVehicle
+      ? [selectedVehicle]
+      : [];
+
+  return {
+    data: selectedVehicle,
+    vehicles,
+  };
+};
 
 export type VehicleServiceError = Error & {
   status?: number;
@@ -74,19 +101,30 @@ const getErrorMessage = (error: any, fallback: string) => {
     return "انتهت جلسة الدخول أو لا توجد صلاحية. سجّل الدخول مرة أخرى.";
   }
 
-  if (status === 404 && serverMessage === "No vehicle assigned to this driver") {
+  if (
+    status === 404 &&
+    serverMessage === "No vehicle assigned to this driver"
+  ) {
     return "لم يتم ربط هذا المستخدم بسيارة. اربط السائق بسيارة من صفحة السيارات ثم أعد تسجيل الدخول.";
   }
 
-  if (status === 404 && String(serverMessage || "").includes("Route not found")) {
+  if (
+    status === 404 &&
+    String(serverMessage || "").includes("Route not found")
+  ) {
     return "مسار السيارات غير موجود على السيرفر المنشور. تأكد من نشر آخر نسخة من الـ backend.";
   }
 
   return serverMessage || error?.message || fallback;
 };
 
-const createServiceError = (error: any, fallback: string): VehicleServiceError => {
-  const nextError = new Error(getErrorMessage(error, fallback)) as VehicleServiceError;
+const createServiceError = (
+  error: any,
+  fallback: string,
+): VehicleServiceError => {
+  const nextError = new Error(
+    getErrorMessage(error, fallback),
+  ) as VehicleServiceError;
   nextError.status = error?.response?.status;
   nextError.serverMessage = error?.response?.data?.message;
   return nextError;
@@ -103,15 +141,30 @@ export async function getAllVehicles(date?: string) {
   }
 }
 
-export async function getMyVehicle(date?: string) {
+export async function getMyVehicleDashboard({
+  date,
+  vehicleId,
+}: {
+  date?: string;
+  vehicleId?: string;
+} = {}) {
   try {
+    const params = {
+      ...(date ? { date } : {}),
+      ...(vehicleId ? { vehicleId } : {}),
+    };
     const response = await apiClient.get("/api/vehicles/me", {
-      params: date ? { date } : undefined,
+      params: Object.keys(params).length ? params : undefined,
     });
-    return extractVehicleSummary(response.data);
+    return normalizeDriverVehiclesDashboard(response.data);
   } catch (error: any) {
     throw createServiceError(error, "Failed to fetch driver vehicle");
   }
+}
+
+export async function getMyVehicle(date?: string, vehicleId?: string) {
+  const dashboard = await getMyVehicleDashboard({ date, vehicleId });
+  return dashboard.data;
 }
 
 export async function createVehicle(payload: CreateVehiclePayload) {

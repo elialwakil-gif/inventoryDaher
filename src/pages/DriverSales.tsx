@@ -23,7 +23,7 @@ import getAllCustomer from "@/services/customer";
 import type { Product, ProductPriceType, sell } from "@/services/transaction";
 import {
   createMyVehicleSale,
-  getMyVehicle,
+  getMyVehicleDashboard,
   type VehicleServiceError,
 } from "@/services/vehicles";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -31,7 +31,10 @@ import { RefreshCw, Truck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-type SelectedProduct = Product & { qty: number; selectedPriceType?: ProductPriceType };
+type SelectedProduct = Product & {
+  qty: number;
+  selectedPriceType?: ProductPriceType;
+};
 type PaymentStatus = "cash" | "part" | "debt";
 
 const toNumber = (value: unknown) => {
@@ -48,10 +51,7 @@ const formatMoney = (value: unknown) =>
     minimumFractionDigits: 0,
   });
 
-const shouldRetryVehicleQuery = (
-  failureCount: number,
-  queryError: Error,
-) => {
+const shouldRetryVehicleQuery = (failureCount: number, queryError: Error) => {
   const status = (queryError as VehicleServiceError).status;
   return status !== 401 && status !== 404 && failureCount < 2;
 };
@@ -60,7 +60,9 @@ export default function DriverSales() {
   const queryClient = useQueryClient();
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState("");
-  const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>(
+    [],
+  );
   const [discount, setDiscount] = useState("");
   const [discountPercent, setDiscountPercent] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("cash");
@@ -70,15 +72,19 @@ export default function DriverSales() {
   const [salesAccountId, setSalesAccountId] = useState("");
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [receivableAccountId, setReceivableAccountId] = useState("");
+  const [selectedVehicleId, setSelectedVehicleId] = useState("");
 
   const {
-    data: vehicleSummary,
+    data: driverVehicleDashboard,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ["driver-vehicle"],
-    queryFn: () => getMyVehicle(),
+    queryKey: ["driver-vehicles", selectedVehicleId],
+    queryFn: () =>
+      getMyVehicleDashboard({
+        vehicleId: selectedVehicleId || undefined,
+      }),
     retry: shouldRetryVehicleQuery,
   });
 
@@ -87,25 +93,31 @@ export default function DriverSales() {
     queryFn: getAllCustomer,
   });
 
+  const vehicleSummary = driverVehicleDashboard?.data;
+  const vehicleSummaries = driverVehicleDashboard?.vehicles || [];
   const products = vehicleSummary?.products || [];
   const vehicle = vehicleSummary?.vehicle;
 
   useEffect(() => {
+    if (!selectedVehicleId && vehicle?.id) {
+      setSelectedVehicleId(vehicle.id);
+    }
+  }, [selectedVehicleId, vehicle?.id]);
+
+  useEffect(() => {
     if (!vehicle) return;
 
-    setSalesAccountId((current) => current || vehicle.defaultSalesAccountId || "");
-    setPaymentAccountId(
-      (current) => current || vehicle.defaultPaymentAccountId || "",
-    );
-    setReceivableAccountId(
-      (current) => current || vehicle.defaultReceivableAccountId || "",
-    );
-  }, [vehicle]);
+    setSelectedProducts([]);
+    setSalesAccountId(vehicle.defaultSalesAccountId || "");
+    setPaymentAccountId(vehicle.defaultPaymentAccountId || "");
+    setReceivableAccountId(vehicle.defaultReceivableAccountId || "");
+  }, [vehicle?.id]);
 
   const subtotal = useMemo(
     () =>
       selectedProducts.reduce(
-        (sum, product) => sum + toNumber(product.qty) * toNumber(product.sellPrice),
+        (sum, product) =>
+          sum + toNumber(product.qty) * toNumber(product.sellPrice),
         0,
       ),
     [selectedProducts],
@@ -151,7 +163,7 @@ export default function DriverSales() {
       toast.success("تم تسجيل البيع من السيارة");
       resetInvoice();
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["driver-vehicle"] }),
+        queryClient.invalidateQueries({ queryKey: ["driver-vehicles"] }),
         queryClient.invalidateQueries({ queryKey: ["vehicles-table"] }),
         queryClient.invalidateQueries({ queryKey: ["products-table"] }),
         queryClient.invalidateQueries({ queryKey: ["sells-table"] }),
@@ -161,6 +173,11 @@ export default function DriverSales() {
   });
 
   const validateSale = () => {
+    if (!vehicle?.id) {
+      toast.error("اختر السيارة");
+      return false;
+    }
+
     if (!customerId) {
       toast.error("اختر الزبون");
       return false;
@@ -173,7 +190,8 @@ export default function DriverSales() {
 
     if (
       selectedProducts.some(
-        (product) => toNumber(product.qty) <= 0 || toNumber(product.sellPrice) <= 0,
+        (product) =>
+          toNumber(product.qty) <= 0 || toNumber(product.sellPrice) <= 0,
       )
     ) {
       toast.error("تأكد من الكميات والأسعار");
@@ -205,7 +223,10 @@ export default function DriverSales() {
       return false;
     }
 
-    if ((paymentStatus === "cash" || paymentStatus === "part") && !paymentAccountId) {
+    if (
+      (paymentStatus === "cash" || paymentStatus === "part") &&
+      !paymentAccountId
+    ) {
       toast.error("اختر حساب القبض");
       return false;
     }
@@ -314,30 +335,68 @@ export default function DriverSales() {
                 {vehicle && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Badge>{vehicle.name}</Badge>
-                    {vehicle.plateNumber && <Badge variant="secondary">{vehicle.plateNumber}</Badge>}
+                    {vehicle.plateNumber && (
+                      <Badge variant="secondary">{vehicle.plateNumber}</Badge>
+                    )}
                     <Badge variant="outline">
-                      الكمية: {formatNumber(vehicleSummary?.totals.totalQuantity)}
+                      الكمية:{" "}
+                      {formatNumber(vehicleSummary?.totals.totalQuantity)}
                     </Badge>
                     <Badge variant="outline">
-                      مبيعات اليوم: {formatMoney(vehicleSummary?.totals.salesTotal)}
+                      مبيعات اليوم:{" "}
+                      {formatMoney(vehicleSummary?.totals.salesTotal)}
                     </Badge>
                   </div>
                 )}
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  queryClient.invalidateQueries({ queryKey: ["driver-vehicle"] })
-                }
-              >
-                <RefreshCw className="h-4 w-4" />
-                تحديث
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                {vehicleSummaries.length > 0 && (
+                  <Select
+                    value={selectedVehicleId || vehicle?.id || ""}
+                    onValueChange={(nextVehicleId) => {
+                      setSelectedVehicleId(nextVehicleId);
+                      resetInvoice();
+                      setSalesAccountId("");
+                      setPaymentAccountId("");
+                      setReceivableAccountId("");
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-56">
+                      <SelectValue placeholder="اختر السيارة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vehicleSummaries.map((summary) => (
+                        <SelectItem
+                          key={summary.vehicle.id}
+                          value={summary.vehicle.id}
+                        >
+                          {summary.vehicle.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    queryClient.invalidateQueries({
+                      queryKey: ["driver-vehicles"],
+                    })
+                  }
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  تحديث
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-3 sm:p-6">
-            {isLoading && <p className="text-muted-foreground">جاري تحميل بيانات السيارة...</p>}
+            {isLoading && (
+              <p className="text-muted-foreground">
+                جاري تحميل بيانات السيارة...
+              </p>
+            )}
             {isError && (
               <p className="text-destructive">
                 {(error as Error)?.message || "لم يتم ربط هذا المستخدم بسيارة"}
@@ -408,14 +467,16 @@ export default function DriverSales() {
                       <Button
                         key={status}
                         type="button"
-                        variant={paymentStatus === status ? "default" : "outline"}
+                        variant={
+                          paymentStatus === status ? "default" : "outline"
+                        }
                         onClick={() => setPaymentStatus(status)}
                       >
                         {status === "cash"
                           ? "نقداً"
                           : status === "part"
-                          ? "جزئي"
-                          : "دين"}
+                            ? "جزئي"
+                            : "دين"}
                       </Button>
                     ))}
                   </div>
@@ -440,7 +501,9 @@ export default function DriverSales() {
                           value={currency}
                           onValueChange={(nextCurrency) => {
                             setCurrency(nextCurrency);
-                            setExchangeRate(nextCurrency === "USD" ? 1 : exchangeRate);
+                            setExchangeRate(
+                              nextCurrency === "USD" ? 1 : exchangeRate,
+                            );
                           }}
                         >
                           <SelectTrigger>
@@ -466,20 +529,39 @@ export default function DriverSales() {
 
                   <div className="rounded-md border bg-muted/30 p-3 text-sm md:col-span-2">
                     <div className="grid gap-1 sm:grid-cols-3">
-                      <span>الإجمالي: {formatCurrencyAmount(saleMoney.totalUSD, "USD")}</span>
-                      <span>المدفوع: {formatCurrencyAmount(saleMoney.paidUSD, "USD")}</span>
-                      <span>المتبقي: {formatCurrencyAmount(saleMoney.remainingUSD, "USD")}</span>
+                      <span>
+                        الإجمالي:{" "}
+                        {formatCurrencyAmount(saleMoney.totalUSD, "USD")}
+                      </span>
+                      <span>
+                        المدفوع:{" "}
+                        {formatCurrencyAmount(saleMoney.paidUSD, "USD")}
+                      </span>
+                      <span>
+                        المتبقي:{" "}
+                        {formatCurrencyAmount(saleMoney.remainingUSD, "USD")}
+                      </span>
                     </div>
                     {saleMoney.paymentCurrency === "SYP" && (
                       <div className="mt-1 grid gap-1 sm:grid-cols-3">
-                        <span>الإجمالي: {formatCurrencyAmount(saleMoney.totalSYP, "SYP")}</span>
-                        <span>المدفوع: {formatCurrencyAmount(saleMoney.paidSYP, "SYP")}</span>
-                        <span>المتبقي: {formatCurrencyAmount(saleMoney.remainingSYP, "SYP")}</span>
+                        <span>
+                          الإجمالي:{" "}
+                          {formatCurrencyAmount(saleMoney.totalSYP, "SYP")}
+                        </span>
+                        <span>
+                          المدفوع:{" "}
+                          {formatCurrencyAmount(saleMoney.paidSYP, "SYP")}
+                        </span>
+                        <span>
+                          المتبقي:{" "}
+                          {formatCurrencyAmount(saleMoney.remainingSYP, "SYP")}
+                        </span>
                       </div>
                     )}
                     {saleMoney.paymentCurrency === "SYP" && (
                       <div className="mt-1 text-muted-foreground">
-                        سعر الصرف المعتمد: {formatExchangeRate(saleMoney.exchangeRate)}
+                        سعر الصرف المعتمد:{" "}
+                        {formatExchangeRate(saleMoney.exchangeRate)}
                       </div>
                     )}
                   </div>
