@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PopupForm from "@/components/ui/custom/PopupForm";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -19,11 +20,12 @@ import {
   createVehicle,
   getAllVehicles,
   loadVehicle,
+  updateVehicle,
   VehicleSummary,
 } from "@/services/vehicles";
 import { getAllWarehouses } from "@/services/warehouse";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PackagePlus, Plus, Truck, X } from "lucide-react";
+import { PackagePlus, Pencil, Plus, Truck, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -53,6 +55,7 @@ const matchesSearch = (value: unknown, search: string) =>
 export default function Vehicles() {
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isLoadOpen, setIsLoadOpen] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
   const [vehicleName, setVehicleName] = useState("");
@@ -62,6 +65,14 @@ export default function Vehicles() {
   const [defaultSalesAccountId, setDefaultSalesAccountId] = useState("");
   const [defaultPaymentAccountId, setDefaultPaymentAccountId] = useState("");
   const [defaultReceivableAccountId, setDefaultReceivableAccountId] = useState("");
+  const [editPlateNumber, setEditPlateNumber] = useState("");
+  const [editDriverId, setEditDriverId] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editDefaultSalesAccountId, setEditDefaultSalesAccountId] = useState("");
+  const [editDefaultPaymentAccountId, setEditDefaultPaymentAccountId] = useState("");
+  const [editDefaultReceivableAccountId, setEditDefaultReceivableAccountId] =
+    useState("");
   const [sourceWarehouse, setSourceWarehouse] = useState("");
   const [loadSearch, setLoadSearch] = useState("");
   const [loadNote, setLoadNote] = useState("");
@@ -91,6 +102,11 @@ export default function Vehicles() {
     vehicleSummaries.find(
       (summary) => summary.vehicle.id === selectedVehicleId,
     ) || vehicleSummaries[0];
+
+  const driverUsers = useMemo(
+    () => users.filter((user) => user.role === "driver"),
+    [users],
+  );
 
   const standardWarehouses = useMemo(
     () =>
@@ -143,6 +159,7 @@ export default function Vehicles() {
       queryClient.invalidateQueries({ queryKey: ["vehicles-table"] }),
       queryClient.invalidateQueries({ queryKey: ["products-table"] }),
       queryClient.invalidateQueries({ queryKey: ["warehouses-table"] }),
+      queryClient.invalidateQueries({ queryKey: ["users-table"] }),
     ]);
   };
 
@@ -174,13 +191,29 @@ export default function Vehicles() {
     onError: (error) => toast.error((error as Error).message),
   });
 
+  const updateVehicleMutation = useMutation({
+    mutationFn: ({
+      vehicleId,
+      payload,
+    }: {
+      vehicleId: string;
+      payload: Parameters<typeof updateVehicle>[1];
+    }) => updateVehicle(vehicleId, payload),
+    onSuccess: async () => {
+      toast.success("ØªÙ… ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø³ÙŠØ§Ø±Ø© Ø¨Ù†Ø¬Ø§Ø­");
+      setIsEditOpen(false);
+      await invalidateVehicleData();
+    },
+    onError: (error) => toast.error((error as Error).message),
+  });
+
   const submitCreateVehicle = () => {
     if (!vehicleName.trim()) {
       toast.error("أدخل اسم السيارة أو مستودعها");
       return;
     }
 
-    const selectedDriver = users.find(
+    const selectedDriver = driverUsers.find(
       (user) => String(user.id || user.username) === driverId,
     );
 
@@ -193,6 +226,51 @@ export default function Vehicles() {
       defaultSalesAccountId: defaultSalesAccountId || undefined,
       defaultPaymentAccountId: defaultPaymentAccountId || undefined,
       defaultReceivableAccountId: defaultReceivableAccountId || undefined,
+    });
+  };
+
+  const openEditVehicle = () => {
+    const vehicle = selectedVehicle?.vehicle;
+
+    if (!vehicle) {
+      toast.error("Ø§Ø®ØªØ± Ø³ÙŠØ§Ø±Ø©");
+      return;
+    }
+
+    setEditPlateNumber(vehicle.plateNumber || "");
+    setEditDriverId(vehicle.driverId || "");
+    setEditLocation(vehicle.location || "");
+    setEditIsActive(vehicle.isActive !== false);
+    setEditDefaultSalesAccountId(vehicle.defaultSalesAccountId || "");
+    setEditDefaultPaymentAccountId(vehicle.defaultPaymentAccountId || "");
+    setEditDefaultReceivableAccountId(vehicle.defaultReceivableAccountId || "");
+    setIsEditOpen(true);
+  };
+
+  const submitEditVehicle = () => {
+    const vehicle = selectedVehicle?.vehicle;
+
+    if (!vehicle) {
+      toast.error("Ø§Ø®ØªØ± Ø³ÙŠØ§Ø±Ø©");
+      return;
+    }
+
+    const selectedDriver = driverUsers.find(
+      (user) => String(user.id || user.username) === editDriverId,
+    );
+
+    updateVehicleMutation.mutate({
+      vehicleId: vehicle.id,
+      payload: {
+        plateNumber: editPlateNumber.trim(),
+        driverId: editDriverId,
+        driverName: selectedDriver?.username || "",
+        location: editLocation.trim(),
+        isActive: editIsActive,
+        defaultSalesAccountId: editDefaultSalesAccountId,
+        defaultPaymentAccountId: editDefaultPaymentAccountId,
+        defaultReceivableAccountId: editDefaultReceivableAccountId,
+      },
     });
   };
 
@@ -271,6 +349,7 @@ export default function Vehicles() {
     name: summary.vehicle.name,
     plateNumber: summary.vehicle.plateNumber || "",
     driverName: summary.vehicle.driverName || summary.vehicle.driverId || "",
+    status: summary.vehicle.isActive === false ? "Inactive" : "Active",
     productsCount: summary.totals.productsCount,
     totalQuantity: formatNumber(summary.totals.totalQuantity),
     stockSellValue: formatMoney(summary.totals.stockSellValue),
@@ -355,16 +434,14 @@ export default function Vehicles() {
                       <SelectValue placeholder="اختر السائق" />
                     </SelectTrigger>
                     <SelectContent>
-                      {users
-                        .filter((user) => user.role !== "admin")
-                        .map((user) => (
-                          <SelectItem
-                            key={String(user.id || user.username)}
-                            value={String(user.id || user.username)}
-                          >
-                            {user.username}
-                          </SelectItem>
-                        ))}
+                      {driverUsers.map((user) => (
+                        <SelectItem
+                          key={String(user.id || user.username)}
+                          value={String(user.id || user.username)}
+                        >
+                          {user.username}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <AccountSelect
@@ -393,6 +470,101 @@ export default function Vehicles() {
                     onClick={submitCreateVehicle}
                   >
                     حفظ السيارة
+                  </Button>
+                </div>
+              </PopupForm>
+
+              <PopupForm
+                title="ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø³ÙŠØ§Ø±Ø©"
+                isOpen={isEditOpen}
+                setIsOpen={setIsEditOpen}
+                trigger={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2"
+                    disabled={!selectedVehicle}
+                    onClick={openEditVehicle}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    ØªØ¹Ø¯ÙŠÙ„
+                  </Button>
+                }
+              >
+                <div className="space-y-3" dir="rtl">
+                  <div className="rounded-md border p-3 text-sm font-semibold">
+                    {selectedVehicle?.vehicle.name || "Ø§Ø®ØªØ± Ø³ÙŠØ§Ø±Ø©"}
+                  </div>
+                  <Input
+                    value={editPlateNumber}
+                    onChange={(event) => setEditPlateNumber(event.target.value)}
+                    placeholder="Ø±Ù‚Ù… Ø§Ù„Ù„ÙˆØ­Ø©"
+                  />
+                  <Input
+                    value={editLocation}
+                    onChange={(event) => setEditLocation(event.target.value)}
+                    placeholder="Ù…Ù„Ø§Ø­Ø¸Ø© Ø£Ùˆ Ø®Ø· Ø³ÙŠØ±"
+                  />
+                  <Select value={editDriverId} onValueChange={setEditDriverId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ø§Ø®ØªØ± Ø§Ù„Ø³Ø§Ø¦Ù‚" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {driverUsers.map((user) => (
+                        <SelectItem
+                          key={String(user.id || user.username)}
+                          value={String(user.id || user.username)}
+                        >
+                          {user.username}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {editDriverId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full"
+                      onClick={() => setEditDriverId("")}
+                    >
+                      Ø¥Ù„ØºØ§Ø¡ Ø±Ø¨Ø· Ø§Ù„Ø³Ø§Ø¦Ù‚
+                    </Button>
+                  )}
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <span className="text-sm font-medium">
+                      Ø§Ù„Ø³ÙŠØ§Ø±Ø© Ù†Ø´Ø·Ø©
+                    </span>
+                    <Switch
+                      checked={editIsActive}
+                      onCheckedChange={setEditIsActive}
+                    />
+                  </div>
+                  <AccountSelect
+                    label="Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ"
+                    value={editDefaultSalesAccountId}
+                    onChange={setEditDefaultSalesAccountId}
+                    filterType="sales"
+                  />
+                  <AccountSelect
+                    label="Ø­Ø³Ø§Ø¨ Ø§Ù„Ù‚Ø¨Ø¶ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ"
+                    value={editDefaultPaymentAccountId}
+                    onChange={setEditDefaultPaymentAccountId}
+                    filterType="payment"
+                  />
+                  <AccountSelect
+                    label="Ø­Ø³Ø§Ø¨ Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ"
+                    value={editDefaultReceivableAccountId}
+                    onChange={setEditDefaultReceivableAccountId}
+                    filterType="receivable"
+                  />
+                  <Button
+                    type="button"
+                    className="w-full"
+                    loading={updateVehicleMutation.isPending}
+                    disabled={updateVehicleMutation.isPending}
+                    onClick={submitEditVehicle}
+                  >
+                    Ø­ÙØ¸ Ø§Ù„ØªØ¹Ø¯ÙŠÙ„
                   </Button>
                 </div>
               </PopupForm>
