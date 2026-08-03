@@ -84,6 +84,11 @@ export const normalizeInvoiceDraftProduct = (
   selectedPriceType: normalizePriceType(product?.selectedPriceType),
   unit: String(product?.unit || ""),
   quantity: toNumber(product?.quantity),
+  reservedQuantity: toNumber(product?.reservedQuantity),
+  alertQuantity:
+    product?.alertQuantity === undefined
+      ? undefined
+      : toNumber(product.alertQuantity),
   warehouse: String(product?.warehouse || ""),
   updatedDate: String(product?.updatedDate || ""),
   qty: toNumber(product?.qty, 1),

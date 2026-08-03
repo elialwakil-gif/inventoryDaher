@@ -119,3 +119,9 @@ export const updatePendingSale = async <T>(record: PendingSaleRecord<T>) =>
   runStoreRequest(PENDING_SALES_STORE, "readwrite", (store) =>
     store.put(record),
   );
+
+export const clearPendingSales = async () =>
+  runStoreRequest(PENDING_SALES_STORE, "readwrite", (store) => store.clear());
+
+export const removeOfflineCache = async (key: string) =>
+  runStoreRequest(CACHE_STORE, "readwrite", (store) => store.delete(key));

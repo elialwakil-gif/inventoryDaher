@@ -67,6 +67,25 @@ const shouldIgnoreIncomingDraft = (
   );
 };
 
+const getDraftFingerprint = (draft: InvoiceDraft) => {
+  const normalizedDraft = normalizeInvoiceDraft(draft);
+
+  return JSON.stringify({
+    ...normalizedDraft,
+    id: "",
+    userId: "",
+    version: 0,
+    updatedAt: "",
+    updatedBy: "",
+    clearedAt: "",
+  });
+};
+
+const areDraftsEquivalent = (
+  currentDraft: InvoiceDraft,
+  nextDraft: InvoiceDraft,
+) => getDraftFingerprint(currentDraft) === getDraftFingerprint(nextDraft);
+
 const markLocalDraftWrite = (draft: InvoiceDraft): InvoiceDraft => {
   const normalizedDraft = normalizeInvoiceDraft(draft);
 
@@ -178,7 +197,13 @@ export function useInvoiceDraftSync() {
       setDraftState((currentDraft) => {
         const nextDraft =
           typeof updater === "function" ? updater(currentDraft) : updater;
-        const normalizedDraft = markLocalDraftWrite(nextDraft);
+        const nextNormalizedDraft = normalizeInvoiceDraft(nextDraft);
+
+        if (areDraftsEquivalent(currentDraft, nextNormalizedDraft)) {
+          return currentDraft;
+        }
+
+        const normalizedDraft = markLocalDraftWrite(nextNormalizedDraft);
         const nextRevision = localRevisionRef.current + 1;
 
         localRevisionRef.current = nextRevision;

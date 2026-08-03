@@ -3,6 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import {
+  clearPendingOfflineSales,
   getPendingOfflineSalesCount,
   syncPendingOfflineSales,
 } from "@/services/offlineSales";
@@ -43,6 +44,20 @@ export function useOfflineSalesSync(queryClient: QueryClient) {
     }
   }, [isOnline, queryClient, refreshPendingSalesCount]);
 
+  const clearOfflineSales = useCallback(async () => {
+    setIsSyncingOfflineSales(true);
+
+    try {
+      await clearPendingOfflineSales();
+      setPendingSalesCount(0);
+      toast.success("تم تفريغ الفواتير المحلية");
+      queryClient.invalidateQueries({ queryKey: ["products-table"] });
+      queryClient.invalidateQueries({ queryKey: ["sells-table"] });
+    } finally {
+      setIsSyncingOfflineSales(false);
+    }
+  }, [queryClient]);
+
   useEffect(() => {
     void refreshPendingSalesCount();
   }, [refreshPendingSalesCount]);
@@ -59,5 +74,6 @@ export function useOfflineSalesSync(queryClient: QueryClient) {
     isSyncingOfflineSales,
     refreshPendingSalesCount,
     syncOfflineSales,
+    clearOfflineSales,
   };
 }

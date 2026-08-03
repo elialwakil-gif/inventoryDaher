@@ -24,7 +24,7 @@ import { enqueueOfflineSale } from "@/services/offlineSales";
 import getAllProducts from "@/services/products";
 import { sell, sellProducts } from "@/services/transaction";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { RefreshCw, Trash2, Wifi, WifiOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -134,6 +134,7 @@ export default function SellProduct() {
     isOnline,
     pendingSalesCount,
     isSyncingOfflineSales,
+    clearOfflineSales,
     refreshPendingSalesCount,
     syncOfflineSales,
   } = useOfflineSalesSync(queryClient);
@@ -314,8 +315,9 @@ export default function SellProduct() {
         changed ||
         nextProduct.id !== product.id ||
         nextProduct.warehouse !== product.warehouse ||
-        nextProduct.quantity !== product.quantity ||
-        nextProduct.reservedQuantity !== product.reservedQuantity;
+        toNumber(nextProduct.quantity) !== toNumber(product.quantity) ||
+        toNumber(nextProduct.reservedQuantity) !==
+          toNumber(product.reservedQuantity);
 
       return nextProduct;
     });
@@ -578,6 +580,21 @@ export default function SellProduct() {
                     className="h-7 px-2 text-xs"
                   >
                     إرسال الآن
+                  </Button>
+                )}
+
+                {pendingSalesCount > 0 && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => void clearOfflineSales()}
+                    disabled={isSyncingOfflineSales}
+                    loading={isSyncingOfflineSales}
+                    className="h-7 px-2 text-xs"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    تفريغ الفواتير المحلية
                   </Button>
                 )}
 

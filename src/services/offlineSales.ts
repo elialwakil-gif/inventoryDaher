@@ -1,8 +1,10 @@
 import {
   addPendingSale,
+  clearPendingSales,
   getOfflineCache,
   getPendingSales,
   isBrowserOnline,
+  removeOfflineCache,
   removePendingSale,
   setOfflineCache,
   updatePendingSale,
@@ -61,6 +63,12 @@ export const enqueueOfflineSale = async (sale: sell) => {
 export const getPendingOfflineSalesCount = async () => {
   const pendingSales = await getPendingSales<sell>();
   return pendingSales.length;
+};
+
+export const clearPendingOfflineSales = async () => {
+  await clearPendingSales();
+  await removeOfflineCache(offlineCacheKeys.products);
+  await removeOfflineCache(`${offlineCacheKeys.products}:table`);
 };
 
 const isRetryableSyncError = (error: any) => {
