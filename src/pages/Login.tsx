@@ -45,7 +45,7 @@ export default function Login() {
         toast.error(res?.error || "فشل تسجيل الدخول");
       }
     } catch (error) {
-      toast.error("حدث خطأ غير متوقع");
+      toast.error((error as Error)?.message || "حدث خطأ غير متوقع");
     } finally {
       setLoading(false);
     }
