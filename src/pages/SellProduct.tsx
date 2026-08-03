@@ -40,6 +40,34 @@ const getAvailableQuantity = (product?: any) =>
     0,
   );
 
+const normalizeLookupValue = (value: unknown) =>
+  String(value || "").trim().toLowerCase();
+
+const findCurrentProductForSale = (
+  selectedProduct: any,
+  currentProducts: any[] = [],
+) => {
+  const selectedId = String(selectedProduct?.id || "");
+  const selectedCode = normalizeLookupValue(selectedProduct?.code);
+  const selectedWarehouse = normalizeLookupValue(selectedProduct?.warehouse);
+  const matchesWarehouse = (product: any) =>
+    !selectedWarehouse ||
+    normalizeLookupValue(product?.warehouse) === selectedWarehouse;
+
+  return (
+    currentProducts.find(
+      (product) =>
+        String(product?.id || "") === selectedId && matchesWarehouse(product),
+    ) ||
+    currentProducts.find(
+      (product) =>
+        selectedCode &&
+        normalizeLookupValue(product?.code) === selectedCode &&
+        matchesWarehouse(product),
+    )
+  );
+};
+
 const getRequestErrorMessage = (error: unknown) => {
   const responseData = (error as any)?.response?.data;
 
@@ -52,6 +80,27 @@ const getRequestErrorMessage = (error: unknown) => {
     responseData?.error ||
     (error as Error)?.message ||
     "حدث خطأ أثناء إنشاء الفاتورة"
+  );
+};
+
+const isOfflineRequestError = (error: unknown) => {
+  const requestError = error as any;
+
+  if (requestError?.response) {
+    return false;
+  }
+
+  if (requestError?.isNetworkError === true) {
+    return true;
+  }
+
+  const errorCode = String(requestError?.code || "");
+  const errorMessage = String(requestError?.message || "");
+
+  return (
+    errorCode === "ERR_NETWORK" ||
+    errorCode === "ECONNABORTED" ||
+    /network error|timeout|failed to fetch/i.test(errorMessage)
   );
 };
 
@@ -123,6 +172,7 @@ export default function SellProduct() {
     ],
   );
   const finalAmount = saleMoney.totalUSD;
+  const canReachServer = isOnline || isConnected;
 
   useEffect(() => {
     const quotation = (location.state as any)?.quotation;
@@ -195,7 +245,7 @@ export default function SellProduct() {
         sale: dataToSend,
       });
 
-      if (!isOnline || !(error as any)?.response) {
+      if (isOfflineRequestError(error)) {
         await enqueueOfflineSale(dataToSend);
         await clearDraft({ localOnly: true });
         await refreshPendingSalesCount();
@@ -325,8 +375,9 @@ export default function SellProduct() {
     }
 
     const unavailableProduct = selectedProducts.find((selectedProduct) => {
-      const currentProduct = products.find(
-        (product: any) => String(product.id) === String(selectedProduct.id),
+      const currentProduct = findCurrentProductForSale(
+        selectedProduct,
+        products,
       );
 
       if (!currentProduct) {
@@ -339,8 +390,9 @@ export default function SellProduct() {
     });
 
     if (unavailableProduct) {
-      const currentProduct = products.find(
-        (product: any) => String(product.id) === String(unavailableProduct.id),
+      const currentProduct = findCurrentProductForSale(
+        unavailableProduct,
+        products,
       );
       const availableQuantity = currentProduct
         ? getAvailableQuantity(currentProduct)
@@ -364,15 +416,28 @@ export default function SellProduct() {
     const saleData: sell = {
       customerId: draft.customerId,
       totalPrice: finalAmount,
-      products: selectedProducts.map((product) => ({
-        ...product,
-        quantity:
-          product.quantity === undefined ? undefined : toNumber(product.quantity),
-        qty: toNumber(product.qty),
-        sellPrice: toNumber(product.sellPrice),
-        payPrice:
-          product.payPrice === undefined ? undefined : toNumber(product.payPrice),
-      })),
+      products: selectedProducts.map((product) => {
+        const currentProduct = findCurrentProductForSale(product, products);
+
+        return {
+          ...product,
+          id: currentProduct?.id || product.id,
+          warehouse: currentProduct?.warehouse || product.warehouse,
+          quantity: currentProduct
+            ? toNumber(currentProduct.quantity)
+            : product.quantity === undefined
+              ? undefined
+              : toNumber(product.quantity),
+          reservedQuantity:
+            currentProduct?.reservedQuantity === undefined
+              ? product.reservedQuantity
+              : toNumber(currentProduct.reservedQuantity),
+          qty: toNumber(product.qty),
+          sellPrice: toNumber(product.sellPrice),
+          payPrice:
+            product.payPrice === undefined ? undefined : toNumber(product.payPrice),
+        };
+      }),
       paymentStatus,
       remainingDebt: saleMoney.remainingUSD,
       paymentAccountId:
@@ -406,15 +471,6 @@ export default function SellProduct() {
       discount: saleMoney.discountUSD,
     };
 
-    if (!isOnline) {
-      await enqueueOfflineSale(saleData);
-      await clearDraft({ localOnly: true });
-      await refreshPendingSalesCount();
-      queryClient.invalidateQueries({ queryKey: ["products-table"] });
-      toast.success("تم حفظ الفاتورة محليا وسيتم إرسالها عند عودة الإنترنت");
-      return;
-    }
-
     sellProductMutation.mutate(saleData);
   };
 
@@ -427,19 +483,25 @@ export default function SellProduct() {
               <h1 className="text-xl font-bold sm:text-2xl">بيع المنتجات</h1>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                 <Badge
-                  variant={!isOnline ? "destructive" : isConnected ? "default" : "outline"}
+                  variant={
+                    !canReachServer
+                      ? "destructive"
+                      : isConnected
+                        ? "default"
+                        : "outline"
+                  }
                   className="gap-1"
                 >
-                  {isOnline && isConnected ? (
+                  {canReachServer ? (
                     <Wifi className="h-3.5 w-3.5" />
                   ) : (
                     <WifiOff className="h-3.5 w-3.5" />
                   )}
-                  {!isOnline
-                    ? "بدون إنترنت"
+                  {!canReachServer
+                    ? "بدون اتصال"
                     : isConnected
                       ? "متصل لحظيا"
-                      : "متصل بدون مزامنة لحظية"}
+                      : "الاتصال متاح"}
                 </Badge>
 
                 {pendingSalesCount > 0 && (
@@ -702,7 +764,7 @@ export default function SellProduct() {
                 void handleSubmit();
               }}
             >
-              {isOnline ? "إتمام عملية البيع" : "حفظ الفاتورة محليا"}
+              إتمام عملية البيع
             </Button>
           </form>
         </CardContent>

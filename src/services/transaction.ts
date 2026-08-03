@@ -105,6 +105,36 @@ export interface Product {
   updatedDate: string;
 }
 
+export type TransactionServiceError = Error & {
+  response?: any;
+  status?: number;
+  code?: string;
+  isNetworkError?: boolean;
+  originalError?: unknown;
+};
+
+const createTransactionServiceError = (
+  error: any,
+  fallbackMessage: string,
+): TransactionServiceError => {
+  const responseData = error?.response?.data;
+  const message =
+    (typeof responseData === "string" ? responseData : undefined) ||
+    responseData?.message ||
+    responseData?.error ||
+    error?.message ||
+    fallbackMessage;
+  const nextError = new Error(message) as TransactionServiceError;
+
+  nextError.response = error?.response;
+  nextError.status = error?.response?.status;
+  nextError.code = error?.code;
+  nextError.isNetworkError = !error?.response;
+  nextError.originalError = error;
+
+  return nextError;
+};
+
 export interface purchase {
   id: string;
   supplierId: string;
@@ -200,13 +230,8 @@ export async function sellProducts({ newSell }: { newSell: sell }) {
     });
     return response.data;
   } catch (err: any) {
-    console.error("خطأ في تسجيل الدخول:", err);
-
-    if (err.response && err.response.data?.message) {
-      throw new Error(err.response.data.message);
-    }
-
-    throw new Error("فشل الاتصال بالسيرفر");
+    console.error("خطأ في تسجيل البيع:", err);
+    throw createTransactionServiceError(err, "فشل الاتصال بالسيرفر");
   }
 }
 

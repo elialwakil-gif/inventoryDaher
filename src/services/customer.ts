@@ -2,20 +2,11 @@ import { Customer } from "@/components/Customers/DetailsInputs";
 import apiClient from "@/lib/axios";
 import {
   getOfflineCache,
-  isBrowserOnline,
   setOfflineCache,
 } from "@/lib/offlineStore";
 import { offlineCacheKeys } from "@/services/offlineSales";
 
 export default async function getAllCustomer() {
-    if (!isBrowserOnline()) {
-      const cachedCustomers = await getOfflineCache(offlineCacheKeys.customers);
-
-      if (cachedCustomers) {
-        return cachedCustomers;
-      }
-    }
-
     try {
         const response = await apiClient.get("/api/customers");
         await setOfflineCache(offlineCacheKeys.customers, response.data);

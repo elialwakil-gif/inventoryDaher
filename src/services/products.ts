@@ -1,7 +1,6 @@
 import apiClient from "@/lib/axios";
 import {
   getOfflineCache,
-  isBrowserOnline,
   setOfflineCache,
 } from "@/lib/offlineStore";
 import { offlineCacheKeys } from "@/services/offlineSales";
@@ -19,14 +18,6 @@ export async function getProducts({
     pricing === "table"
       ? `${offlineCacheKeys.products}:table`
       : offlineCacheKeys.products;
-
-  if (!isBrowserOnline()) {
-    const cachedProducts = await getOfflineCache(cacheKey);
-
-    if (cachedProducts) {
-      return cachedProducts;
-    }
-  }
 
   try {
     const response = await apiClient.get("/api/products", {
