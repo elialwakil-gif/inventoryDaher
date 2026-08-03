@@ -28,6 +28,7 @@ export interface InvoiceDraft {
   version?: number;
   updatedAt?: string;
   updatedBy?: string;
+  clearedAt?: string;
 }
 
 export type InvoiceDraftUpdate = Partial<InvoiceDraft>;
@@ -64,6 +65,8 @@ export const createEmptyInvoiceDraft = (): InvoiceDraft => ({
   paymentAccountId: "",
   receivableAccountId: "",
   salesAccountId: "",
+  version: 0,
+  updatedAt: new Date().toISOString(),
 });
 
 export const normalizeInvoiceDraftProduct = (
@@ -130,6 +133,10 @@ export const normalizeInvoiceDraft = (
     paymentAccountId: String(rawDraft.paymentAccountId || ""),
     receivableAccountId: String(rawDraft.receivableAccountId || ""),
     salesAccountId: String(rawDraft.salesAccountId || ""),
+    version: toNumber(rawDraft.version),
+    updatedAt: String(rawDraft.updatedAt || emptyDraft.updatedAt || ""),
+    updatedBy: rawDraft.updatedBy ? String(rawDraft.updatedBy) : undefined,
+    clearedAt: rawDraft.clearedAt ? String(rawDraft.clearedAt) : undefined,
   };
 };
 

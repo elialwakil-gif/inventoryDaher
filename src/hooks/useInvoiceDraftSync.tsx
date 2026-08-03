@@ -41,6 +41,42 @@ const createClientId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
+const toTimestamp = (value: unknown) => {
+  const timestamp = new Date(String(value || "")).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+const shouldIgnoreIncomingDraft = (
+  currentDraft: InvoiceDraft,
+  incomingDraft: InvoiceDraft,
+) => {
+  const currentVersion = Number(currentDraft.version || 0);
+  const incomingVersion = Number(incomingDraft.version || 0);
+
+  if (currentVersion && incomingVersion && incomingVersion < currentVersion) {
+    return true;
+  }
+
+  const currentUpdatedAt = toTimestamp(currentDraft.updatedAt);
+  const incomingUpdatedAt = toTimestamp(incomingDraft.updatedAt);
+
+  return Boolean(
+    currentUpdatedAt &&
+      incomingUpdatedAt &&
+      incomingUpdatedAt < currentUpdatedAt,
+  );
+};
+
+const markLocalDraftWrite = (draft: InvoiceDraft): InvoiceDraft => {
+  const normalizedDraft = normalizeInvoiceDraft(draft);
+
+  return {
+    ...normalizedDraft,
+    clearedAt: undefined,
+    updatedAt: new Date().toISOString(),
+  };
+};
+
 export function useInvoiceDraftSync() {
   const [draft, setDraftState] = useState<InvoiceDraft>(
     createEmptyInvoiceDraft,
@@ -142,7 +178,7 @@ export function useInvoiceDraftSync() {
       setDraftState((currentDraft) => {
         const nextDraft =
           typeof updater === "function" ? updater(currentDraft) : updater;
-        const normalizedDraft = normalizeInvoiceDraft(nextDraft);
+        const normalizedDraft = markLocalDraftWrite(nextDraft);
         const nextRevision = localRevisionRef.current + 1;
 
         localRevisionRef.current = nextRevision;
@@ -200,7 +236,10 @@ export function useInvoiceDraftSync() {
   }, [applyDraft, showSyncError]);
 
   const clearDraft = useCallback(async (options?: ClearDraftOptions) => {
-    const emptyDraft = createEmptyInvoiceDraft();
+    const emptyDraft = {
+      ...createEmptyInvoiceDraft(),
+      updatedAt: new Date().toISOString(),
+    };
     localRevisionRef.current += 1;
 
     if (saveTimerRef.current) {
@@ -210,7 +249,7 @@ export function useInvoiceDraftSync() {
     applyDraft(emptyDraft);
     await setOfflineCache(offlineCacheKeys.invoiceDraft, emptyDraft);
 
-    if (options?.localOnly || !isBrowserOnline()) {
+    if (options?.localOnly) {
       setLastSyncedAt(new Date());
       return;
     }
@@ -225,6 +264,8 @@ export function useInvoiceDraftSync() {
       setLastSyncedAt(new Date());
       getInvoiceDraftSocket().emit("invoice-draft:clear", {
         clientId: clientIdRef.current,
+        draft: serverDraft,
+        alreadySaved: true,
       });
     } catch (error) {
       console.error("Invoice draft clear failed:", error);
@@ -253,7 +294,13 @@ export function useInvoiceDraftSync() {
         return;
       }
 
-      applyDraft(getSocketDraft(payload));
+      const incomingDraft = getSocketDraft(payload);
+
+      if (shouldIgnoreIncomingDraft(draftRef.current, incomingDraft)) {
+        return;
+      }
+
+      applyDraft(incomingDraft);
       setLastSyncedAt(new Date());
     };
 
@@ -262,7 +309,15 @@ export function useInvoiceDraftSync() {
         return;
       }
 
-      applyDraft(createEmptyInvoiceDraft());
+      const incomingDraft = getSocketDraft(
+        payload?.draft || createEmptyInvoiceDraft(),
+      );
+
+      if (shouldIgnoreIncomingDraft(draftRef.current, incomingDraft)) {
+        return;
+      }
+
+      applyDraft(incomingDraft);
       setLastSyncedAt(new Date());
     };
 

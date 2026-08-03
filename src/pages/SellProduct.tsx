@@ -53,6 +53,10 @@ const findCurrentProductForSale = (
   const matchesWarehouse = (product: any) =>
     !selectedWarehouse ||
     normalizeLookupValue(product?.warehouse) === selectedWarehouse;
+  const codeMatches = currentProducts.filter(
+    (product) =>
+      selectedCode && normalizeLookupValue(product?.code) === selectedCode,
+  );
 
   return (
     currentProducts.find(
@@ -64,7 +68,11 @@ const findCurrentProductForSale = (
         selectedCode &&
         normalizeLookupValue(product?.code) === selectedCode &&
         matchesWarehouse(product),
-    )
+    ) ||
+    currentProducts.find(
+      (product) => selectedId && String(product?.id || "") === selectedId,
+    ) ||
+    (codeMatches.length === 1 ? codeMatches[0] : undefined)
   );
 };
 
@@ -267,6 +275,55 @@ export default function SellProduct() {
     queryKey: ["customers-table"],
     queryFn: getAllCustomer,
   });
+
+  useEffect(() => {
+    if (!Array.isArray(products) || !products.length || !selectedProducts.length) {
+      return;
+    }
+
+    let changed = false;
+    const reconciledProducts = selectedProducts.map((product) => {
+      const currentProduct = findCurrentProductForSale(product, products);
+
+      if (!currentProduct) {
+        return product;
+      }
+
+      const nextProduct = {
+        ...product,
+        id: currentProduct.id || product.id,
+        warehouse: currentProduct.warehouse || product.warehouse,
+        quantity: toNumber(currentProduct.quantity),
+        reservedQuantity: toNumber(currentProduct.reservedQuantity),
+        payPrice:
+          currentProduct.payPrice === undefined
+            ? product.payPrice
+            : toNumber(currentProduct.payPrice),
+        wholesalePrice:
+          currentProduct.wholesalePrice === undefined
+            ? product.wholesalePrice
+            : toNumber(currentProduct.wholesalePrice),
+        superWholesalePrice:
+          currentProduct.superWholesalePrice === undefined
+            ? product.superWholesalePrice
+            : toNumber(currentProduct.superWholesalePrice),
+        updatedDate: currentProduct.updatedDate || product.updatedDate,
+      };
+
+      changed =
+        changed ||
+        nextProduct.id !== product.id ||
+        nextProduct.warehouse !== product.warehouse ||
+        nextProduct.quantity !== product.quantity ||
+        nextProduct.reservedQuantity !== product.reservedQuantity;
+
+      return nextProduct;
+    });
+
+    if (changed) {
+      patchDraft({ products: reconciledProducts }, { immediate: true });
+    }
+  }, [patchDraft, products, selectedProducts]);
 
   const customerColumns = [
     { key: "id", label: "الرمز", sortable: true, hidden: true },
@@ -553,8 +610,12 @@ export default function SellProduct() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => void clearDraft()}
-              disabled={isSyncing || sellProductMutation.isPending}
+              onClick={() => {
+                void clearDraft().then(() => {
+                  toast.success("تم تفريغ المسودة");
+                });
+              }}
+              disabled={sellProductMutation.isPending}
               className="w-full md:w-auto"
             >
               تفريغ المسودة
