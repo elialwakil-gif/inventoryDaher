@@ -330,6 +330,11 @@ export default function Vehicles() {
       return;
     }
 
+    if (loadProducts.some((product) => toNumber(product.loadSellPrice) <= 0)) {
+      toast.error("تأكد من سعر المبيع للمنتجات");
+      return;
+    }
+
     loadVehicleMutation.mutate({
       vehicleId: vehicle.id,
       payload: {
@@ -656,7 +661,8 @@ export default function Vehicles() {
                       />
                       <Input
                         type="number"
-                        min={0}
+                        min={0.01}
+                        step={0.01}
                         value={product.loadSellPrice}
                         onChange={(event) =>
                           updateLoadProduct(product.id, {
