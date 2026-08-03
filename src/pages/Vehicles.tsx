@@ -200,7 +200,7 @@ export default function Vehicles() {
       payload: Parameters<typeof updateVehicle>[1];
     }) => updateVehicle(vehicleId, payload),
     onSuccess: async () => {
-      toast.success("ØªÙ… ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø³ÙŠØ§Ø±Ø© Ø¨Ù†Ø¬Ø§Ø­");
+      toast.success("تم تعديل السيارة بنجاح");
       setIsEditOpen(false);
       await invalidateVehicleData();
     },
@@ -233,7 +233,7 @@ export default function Vehicles() {
     const vehicle = selectedVehicle?.vehicle;
 
     if (!vehicle) {
-      toast.error("Ø§Ø®ØªØ± Ø³ÙŠØ§Ø±Ø©");
+      toast.error("اختر سيارة");
       return;
     }
 
@@ -251,7 +251,7 @@ export default function Vehicles() {
     const vehicle = selectedVehicle?.vehicle;
 
     if (!vehicle) {
-      toast.error("Ø§Ø®ØªØ± Ø³ÙŠØ§Ø±Ø©");
+      toast.error("اختر سيارة");
       return;
     }
 
@@ -475,7 +475,7 @@ export default function Vehicles() {
               </PopupForm>
 
               <PopupForm
-                title="ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø³ÙŠØ§Ø±Ø©"
+                title="تعديل السيارة"
                 isOpen={isEditOpen}
                 setIsOpen={setIsEditOpen}
                 trigger={
@@ -487,27 +487,27 @@ export default function Vehicles() {
                     onClick={openEditVehicle}
                   >
                     <Pencil className="h-4 w-4" />
-                    ØªØ¹Ø¯ÙŠÙ„
+                    تعديل
                   </Button>
                 }
               >
                 <div className="space-y-3" dir="rtl">
                   <div className="rounded-md border p-3 text-sm font-semibold">
-                    {selectedVehicle?.vehicle.name || "Ø§Ø®ØªØ± Ø³ÙŠØ§Ø±Ø©"}
+                    {selectedVehicle?.vehicle.name || "اختر سيارة"}
                   </div>
                   <Input
                     value={editPlateNumber}
                     onChange={(event) => setEditPlateNumber(event.target.value)}
-                    placeholder="Ø±Ù‚Ù… Ø§Ù„Ù„ÙˆØ­Ø©"
+                    placeholder="رقم اللوحة"
                   />
                   <Input
                     value={editLocation}
                     onChange={(event) => setEditLocation(event.target.value)}
-                    placeholder="Ù…Ù„Ø§Ø­Ø¸Ø© Ø£Ùˆ Ø®Ø· Ø³ÙŠØ±"
+                    placeholder="ملاحظة أو خط سير"
                   />
                   <Select value={editDriverId} onValueChange={setEditDriverId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Ø§Ø®ØªØ± Ø§Ù„Ø³Ø§Ø¦Ù‚" />
+                      <SelectValue placeholder="اختر السائق" />
                     </SelectTrigger>
                     <SelectContent>
                       {driverUsers.map((user) => (
@@ -527,12 +527,12 @@ export default function Vehicles() {
                       className="w-full"
                       onClick={() => setEditDriverId("")}
                     >
-                      Ø¥Ù„ØºØ§Ø¡ Ø±Ø¨Ø· Ø§Ù„Ø³Ø§Ø¦Ù‚
+                      إلغاء ربط السائق
                     </Button>
                   )}
                   <div className="flex items-center justify-between rounded-md border p-3">
                     <span className="text-sm font-medium">
-                      Ø§Ù„Ø³ÙŠØ§Ø±Ø© Ù†Ø´Ø·Ø©
+                      السيارة نشطة
                     </span>
                     <Switch
                       checked={editIsActive}
@@ -540,19 +540,19 @@ export default function Vehicles() {
                     />
                   </div>
                   <AccountSelect
-                    label="Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ"
+                    label="حساب المبيعات الافتراضي"
                     value={editDefaultSalesAccountId}
                     onChange={setEditDefaultSalesAccountId}
                     filterType="sales"
                   />
                   <AccountSelect
-                    label="Ø­Ø³Ø§Ø¨ Ø§Ù„Ù‚Ø¨Ø¶ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ"
+                    label="حساب القبض الافتراضي"
                     value={editDefaultPaymentAccountId}
                     onChange={setEditDefaultPaymentAccountId}
                     filterType="payment"
                   />
                   <AccountSelect
-                    label="Ø­Ø³Ø§Ø¨ Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ"
+                    label="حساب العملاء الافتراضي"
                     value={editDefaultReceivableAccountId}
                     onChange={setEditDefaultReceivableAccountId}
                     filterType="receivable"
@@ -564,7 +564,7 @@ export default function Vehicles() {
                     disabled={updateVehicleMutation.isPending}
                     onClick={submitEditVehicle}
                   >
-                    Ø­ÙØ¸ Ø§Ù„ØªØ¹Ø¯ÙŠÙ„
+                    حفظ التعديل
                   </Button>
                 </div>
               </PopupForm>

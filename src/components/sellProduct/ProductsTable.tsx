@@ -14,9 +14,17 @@ import { X } from "lucide-react";
 import { toast } from "sonner";
 
 type SelectedProduct = Product & { qty: number; selectedPriceType?: ProductPriceType };
+type StandardProductPriceType = Exclude<ProductPriceType, "custom">;
+
+const allStandardPriceTypes: StandardProductPriceType[] = [
+  "sellPrice",
+  "wholesalePrice",
+  "superWholesalePrice",
+  "payPrice",
+];
 
 const priceTypeOptions: Array<{
-  value: Exclude<ProductPriceType, "custom">;
+  value: StandardProductPriceType;
   label: string;
 }> = [
   { value: "sellPrice", label: "سعر المبيع" },
@@ -51,6 +59,8 @@ interface ProductsTableProps {
   onChange: (selected: SelectedProduct[]) => void;
   setAmount?: any;
   enforceStock?: boolean;
+  allowedPriceTypes?: StandardProductPriceType[];
+  allowCustomPrice?: boolean;
 }
 
 const ProductsTable: React.FC<ProductsTableProps> = ({
@@ -59,20 +69,63 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
   onChange,
   setAmount,
   enforceStock = true,
+  allowedPriceTypes = allStandardPriceTypes,
+  allowCustomPrice = true,
 }) => {
   const [search, setSearch] = useState("");
   const [internalSelectedProducts, setInternalSelectedProducts] = useState<
     SelectedProduct[]
   >([]);
   const [defaultPriceType, setDefaultPriceType] =
-    useState<Exclude<ProductPriceType, "custom">>("sellPrice");
+    useState<StandardProductPriceType>("sellPrice");
   const isControlled = controlledSelectedProducts !== undefined;
   const selectedProducts = controlledSelectedProducts || internalSelectedProducts;
   const selectedProductsRef = useRef<SelectedProduct[]>(selectedProducts);
+  const allowedPriceTypeKey = allowedPriceTypes.join("|");
+  const availablePriceTypeOptions = useMemo(() => {
+    const allowedTypes = allowedPriceTypes.length
+      ? allowedPriceTypes
+      : ["sellPrice"];
+    const allowedTypeSet = new Set(allowedTypes);
+
+    return priceTypeOptions.filter((option) => allowedTypeSet.has(option.value));
+  }, [allowedPriceTypeKey]);
+  const primaryPriceType = availablePriceTypeOptions[0]?.value || "sellPrice";
+  const primaryPriceTypeLabel =
+    availablePriceTypeOptions[0]?.label || priceTypeOptions[0].label;
+  const resolvedDefaultPriceType = availablePriceTypeOptions.some(
+    (option) => option.value === defaultPriceType,
+  )
+    ? defaultPriceType
+    : primaryPriceType;
+  const canChoosePriceType =
+    availablePriceTypeOptions.length > 1 || allowCustomPrice;
+  const isSelectablePriceType = (priceType: ProductPriceType) =>
+    priceType === "custom"
+      ? allowCustomPrice
+      : availablePriceTypeOptions.some((option) => option.value === priceType);
+  const getSelectedPriceTypeValue = (
+    product: SelectedProduct,
+  ): ProductPriceType => {
+    if (
+      product.selectedPriceType &&
+      isSelectablePriceType(product.selectedPriceType)
+    ) {
+      return product.selectedPriceType;
+    }
+
+    return allowCustomPrice ? "custom" : primaryPriceType;
+  };
 
   useEffect(() => {
     selectedProductsRef.current = selectedProducts;
   }, [selectedProducts]);
+
+  useEffect(() => {
+    if (defaultPriceType !== resolvedDefaultPriceType) {
+      setDefaultPriceType(resolvedDefaultPriceType);
+    }
+  }, [defaultPriceType, resolvedDefaultPriceType]);
 
   const commitSelectedProducts = (
     updater:
@@ -160,8 +213,8 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
         {
           ...product,
           qty: 1,
-          selectedPriceType: defaultPriceType,
-          sellPrice: getProductPrice(product, defaultPriceType),
+          selectedPriceType: resolvedDefaultPriceType,
+          sellPrice: getProductPrice(product, resolvedDefaultPriceType),
         },
       ];
       return newSelected;
@@ -186,6 +239,11 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
   };
 
   const updatePrice = (id: string, price: number) => {
+    if (!allowCustomPrice) {
+      toast.error("لا يمكن تعديل السعر في هذه الصفحة");
+      return;
+    }
+
     const nextPrice = toNumber(price);
 
     if (nextPrice <= 0) {
@@ -205,6 +263,11 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
   };
 
   const updatePriceType = (id: string, priceType: ProductPriceType) => {
+    if (!isSelectablePriceType(priceType)) {
+      toast.error("نوع السعر غير متاح في هذه الصفحة");
+      return;
+    }
+
     commitSelectedProducts((current) =>
       current.map((p) => {
         if (p.id !== id) return p;
@@ -234,24 +297,32 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
     <div className="rounded-lg bg-white p-3 shadow sm:p-4" dir="rtl">
       <h3 className="mb-3 text-lg font-bold">اختيار المنتجات</h3>
 
-      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-[220px_1fr_auto]">
-        <Select
-          value={defaultPriceType}
-          onValueChange={(value) =>
-            setDefaultPriceType(value as Exclude<ProductPriceType, "custom">)
-          }
-        >
-          <SelectTrigger className="h-11">
-            <SelectValue placeholder="نوع السعر" />
-          </SelectTrigger>
-          <SelectContent>
-            {priceTypeOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div
+        className={`mb-3 grid grid-cols-1 gap-2 ${
+          availablePriceTypeOptions.length > 1
+            ? "sm:grid-cols-[220px_1fr_auto]"
+            : "sm:grid-cols-[1fr_auto]"
+        }`}
+      >
+        {availablePriceTypeOptions.length > 1 && (
+          <Select
+            value={resolvedDefaultPriceType}
+            onValueChange={(value) =>
+              setDefaultPriceType(value as StandardProductPriceType)
+            }
+          >
+            <SelectTrigger className="h-11">
+              <SelectValue placeholder="نوع السعر" />
+            </SelectTrigger>
+            <SelectContent>
+              {availablePriceTypeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Input
           placeholder="ابحث عن المنتج بالاسم أو الكود..."
           value={search}
@@ -274,7 +345,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
               onClick={() => addProduct(p)}
             >
               <span className="font-medium">
-                {p.name} ({p.code}) - ${getProductPrice(p, defaultPriceType)}
+                {p.name} ({p.code}) - ${getProductPrice(p, resolvedDefaultPriceType)}
               </span>
               <span className="text-muted-foreground">
                 {p.warehouse} | المتاح: {getAvailableQuantity(p)}
@@ -305,35 +376,44 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div
+                  className={`grid grid-cols-1 gap-2 ${
+                    canChoosePriceType ? "sm:grid-cols-3" : "sm:grid-cols-2"
+                  }`}
+                >
+                  {canChoosePriceType && (
+                    <label className="space-y-1 text-sm">
+                      <span>نوع السعر</span>
+                      <Select
+                        value={getSelectedPriceTypeValue(p)}
+                        onValueChange={(value) =>
+                          updatePriceType(p.id, value as ProductPriceType)
+                        }
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availablePriceTypeOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                          {allowCustomPrice && (
+                            <SelectItem value="custom">سعر مخصص</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </label>
+                  )}
                   <label className="space-y-1 text-sm">
-                    <span>نوع السعر</span>
-                    <Select
-                      value={p.selectedPriceType || "custom"}
-                      onValueChange={(value) =>
-                        updatePriceType(p.id, value as ProductPriceType)
-                      }
-                    >
-                      <SelectTrigger className="h-10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {priceTypeOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="custom">سعر مخصص</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </label>
-                  <label className="space-y-1 text-sm">
-                    <span>السعر</span>
+                    <span>{canChoosePriceType ? "السعر" : primaryPriceTypeLabel}</span>
                     <Input
                       type="number"
                       min={0}
                       value={p.sellPrice}
                       onChange={(e) => updatePrice(p.id, Number(e.target.value))}
+                      disabled={!allowCustomPrice}
                       className="h-10"
                     />
                   </label>
@@ -359,13 +439,21 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
           </div>
 
           <div className="hidden overflow-x-auto rounded-md border md:block">
-            <table className="w-full min-w-[860px] border-collapse text-sm">
+            <table
+              className={`w-full border-collapse text-sm ${
+                canChoosePriceType ? "min-w-[860px]" : "min-w-[720px]"
+              }`}
+            >
               <thead>
                 <tr>
                   <th className="border p-2">المنتج</th>
                   <th className="border p-2">الكود</th>
-                  <th className="border p-2">نوع السعر</th>
-                  <th className="border p-2">السعر</th>
+                  {canChoosePriceType && (
+                    <th className="border p-2">نوع السعر</th>
+                  )}
+                  <th className="border p-2">
+                    {canChoosePriceType ? "السعر" : primaryPriceTypeLabel}
+                  </th>
                   <th className="border p-2">الكمية</th>
                   <th className="border p-2">المجموع</th>
                   <th className="border p-2">حذف</th>
@@ -376,32 +464,37 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                   <tr key={p.id}>
                     <td className="border p-2">{p.name}</td>
                     <td className="border p-2">{p.code}</td>
-                    <td className="border p-2">
-                      <Select
-                        value={p.selectedPriceType || "custom"}
-                        onValueChange={(value) =>
-                          updatePriceType(p.id, value as ProductPriceType)
-                        }
-                      >
-                        <SelectTrigger className="h-10 w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {priceTypeOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="custom">سعر مخصص</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
+                    {canChoosePriceType && (
+                      <td className="border p-2">
+                        <Select
+                          value={getSelectedPriceTypeValue(p)}
+                          onValueChange={(value) =>
+                            updatePriceType(p.id, value as ProductPriceType)
+                          }
+                        >
+                          <SelectTrigger className="h-10 w-40">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availablePriceTypeOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                            {allowCustomPrice && (
+                              <SelectItem value="custom">سعر مخصص</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                    )}
                     <td className="border p-2">
                       <Input
                         type="number"
                         min={0}
                         value={p.sellPrice}
                         onChange={(e) => updatePrice(p.id, Number(e.target.value))}
+                        disabled={!allowCustomPrice}
                         className="w-24"
                       />
                     </td>
@@ -430,7 +523,10 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                   </tr>
                 ))}
                 <tr>
-                  <td colSpan={5} className="border p-2 text-right font-bold">
+                  <td
+                    colSpan={canChoosePriceType ? 5 : 4}
+                    className="border p-2 text-right font-bold"
+                  >
                     الإجمالي
                   </td>
                   <td colSpan={2} className="border p-2 font-bold">

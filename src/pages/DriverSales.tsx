@@ -435,6 +435,8 @@ export default function DriverSales() {
                     products={products}
                     selectedProducts={selectedProducts}
                     onChange={setSelectedProducts}
+                    allowedPriceTypes={["sellPrice"]}
+                    allowCustomPrice={false}
                     enforceStock
                   />
                 </div>
