@@ -379,6 +379,7 @@ export default function DriverSales() {
                 <Button
                   type="button"
                   variant="outline"
+                  className="w-full sm:w-auto"
                   onClick={() =>
                     queryClient.invalidateQueries({
                       queryKey: ["driver-vehicles"],
@@ -464,7 +465,7 @@ export default function DriverSales() {
                     onChange={() => {}}
                   />
 
-                  <div className="grid grid-cols-3 gap-2 md:col-span-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:col-span-2">
                     {(["cash", "part", "debt"] as const).map((status) => (
                       <Button
                         key={status}

@@ -234,7 +234,7 @@ export default function Home() {
     <DashboardLayout>
       <div
         dir="rtl"
-        className="min-h-screen rounded-3xl bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4 md:p-6"
+        className="min-h-full rounded-xl bg-gradient-to-br from-slate-50 via-white to-slate-100 p-3 sm:p-4 md:rounded-3xl md:p-6"
       >
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -280,7 +280,7 @@ export default function Home() {
                     {loading ? (
                       <div className="mt-3 h-8 w-28 animate-pulse rounded-xl bg-slate-200" />
                     ) : (
-                      <h2 className="mt-2 text-2xl font-black text-slate-800">
+                      <h2 className="mt-2 break-words text-xl font-black text-slate-800 sm:text-2xl">
                         {item.value}
                       </h2>
                     )}
@@ -343,7 +343,7 @@ export default function Home() {
                 lastOperations.map((operation) => (
                   <div
                     key={operation.id}
-                    className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-4 transition hover:bg-slate-50 hover:shadow-sm"
+                    className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 transition hover:bg-slate-50 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div>
                       <div className="font-bold text-slate-800">
@@ -355,7 +355,7 @@ export default function Home() {
                     </div>
 
                     <span
-                      className={`rounded-full px-3 py-1 text-sm font-black ${
+                      className={`self-start break-words rounded-full px-3 py-1 text-sm font-black ${
                         operation.sign > 0
                           ? "bg-emerald-50 text-emerald-700"
                           : "bg-rose-50 text-rose-700"

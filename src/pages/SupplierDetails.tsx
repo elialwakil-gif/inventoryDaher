@@ -565,8 +565,8 @@ export default function SupplierDetails() {
   return (
     <DashboardLayout>
       <div className="space-y-6" dir="rtl">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">بيانات المورد</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-bold sm:text-3xl">بيانات المورد</h1>
           <Button onClick={() => navigate(-1)} variant="outline">
             <ArrowLeft className="ml-2 w-4 h-4" /> رجوع
           </Button>
@@ -756,7 +756,7 @@ export default function SupplierDetails() {
                 data={supplierPayments}
               />
 
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
                 <div className="rounded-md border p-3">
                   <p className="text-sm text-muted-foreground">فواتير نقدية</p>
                   <p className="text-xl font-bold">{purchasesSummary.cash}</p>

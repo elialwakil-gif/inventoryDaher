@@ -19,7 +19,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <ScreenWrapper>
-      <div className="flex h-screen overflow-hidden text-foreground">
+      <div className="flex h-dvh min-h-0 overflow-hidden text-foreground">
         <Sidebar
           isCollapsed={sidebarCollapsed}
           onToggle={toggleSidebar}
@@ -38,15 +38,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             />
           </SheetContent>
         </Sheet>
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <Header onToggleSidebar={() => setMobileSidebarOpen(true)} />
           <main
             className={cn(
-              "flex-1 overflow-auto p-3 sm:p-4 md:p-6 lg:p-8",
+              "min-w-0 flex-1 overflow-auto p-3 sm:p-4 md:p-6 lg:p-8",
               "transition-all duration-300",
             )}
           >
-            <div dir="rtl" className="mx-auto w-full max-w-7xl space-y-4 md:space-y-6">{children}</div>
+            <div dir="rtl" className="mx-auto w-full min-w-0 max-w-7xl space-y-4 md:space-y-6">{children}</div>
           </main>
         </div>
       </div>

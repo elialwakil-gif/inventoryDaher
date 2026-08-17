@@ -244,10 +244,10 @@ export default function TrialBalance() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-start font-normal">
+                <Button variant="outline" className="w-full justify-start font-normal sm:w-auto">
                   <CalendarIcon className="ml-2 h-4 w-4" />
                   {asOfDate ? format(asOfDate, "yyyy-MM-dd") : "حتى تاريخ"}
                 </Button>
@@ -270,7 +270,7 @@ export default function TrialBalance() {
               مسح التاريخ
             </Button>
 
-            <div className="w-full lg:w-56">
+            <div className="w-full sm:w-56">
               <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="تصفية حسب العملة" />

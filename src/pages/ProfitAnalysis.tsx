@@ -615,10 +615,10 @@ export default function ProfitAnalysis() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-start font-normal">
+                <Button variant="outline" className="w-full justify-start font-normal sm:w-auto">
                   <CalendarIcon className="ml-2 h-4 w-4" />
                   {dateRange?.from ? (
                     dateRange.to ? (
@@ -653,7 +653,7 @@ export default function ProfitAnalysis() {
               مسح التاريخ
             </Button>
 
-            <div className="w-full lg:w-48">
+            <div className="w-full sm:w-48">
               <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="العملة" />

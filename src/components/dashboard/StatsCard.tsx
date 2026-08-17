@@ -40,15 +40,15 @@ export function StatsCard({
   }, []);
 
   return onlyAdmin && inventoryUser?.role !== "admin" ? null : !loading ? (
-    <Card onClick={onClick} className={cn("stat-card", className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+    <Card onClick={onClick} className={cn("stat-card min-w-0", className)}>
+      <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-2">
+        <CardTitle className="min-w-0 break-words text-sm font-medium">{title}</CardTitle>
         <Icon className="h-5 w-5 text-muted-foreground" />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className="break-words text-xl font-bold sm:text-2xl">{value}</div>
         {(description || trend) && (
-          <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {trend && (
               <span
                 className={cn(
@@ -75,8 +75,8 @@ export function StatsCard({
         className,
       )}
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-2">
+        <CardTitle className="min-w-0 break-words text-sm font-medium">{title}</CardTitle>
         <Loader2 className="animate-spin repeat-infinite opacity-25"/>
       </CardHeader>
 
@@ -88,10 +88,10 @@ export function StatsCard({
           </div>
         ) : (
           <>
-            <div className="text-2xl font-bold">{value}</div>
+            <div className="break-words text-xl font-bold sm:text-2xl">{value}</div>
 
             {(description || trend) && (
-              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 {trend && (
                   <span
                     className={cn(

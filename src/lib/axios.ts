@@ -1,5 +1,7 @@
 import axios from "axios";
 
+const encodeHeaderValue = (value: unknown) => encodeURIComponent(String(value));
+
 /**
  * جلب رابط السيرفر من localStorage أو env
  */
@@ -9,15 +11,15 @@ export const getBaseURL = () => {
     const inventoryUser = storedUser ? JSON.parse(storedUser) : null;
 
     return (
-      // "https://serverinventorydaherserver-b7gf.onrender.com"
+      // "https://dahersoftmserver.onrender.com"
       inventoryUser?.serverURL ||
       import.meta.env.VITE_API_BASE_URL ||
-      "https://serverinventorydaherserver-b7gf.onrender.com"
+      "https://dahersoftmserver.onrender.com"
     );
   } catch (error) {
     console.error("Failed to parse InventoryUser:", error);
     return (
-      import.meta.env.VITE_API_BASE_URL || "https://serverinventorydaherserver-b7gf.onrender.com"
+      import.meta.env.VITE_API_BASE_URL || "https://dahersoftmserver.onrender.com"
     );
   }
 };
@@ -46,11 +48,13 @@ apiClient.interceptors.request.use(
     const userId = inventoryUser?.id || inventoryUser?._id || inventoryUser?.username;
 
     if (userId) {
-      config.headers["X-Inventory-User-Id"] = userId;
+      config.headers["X-Inventory-User-Id"] = encodeHeaderValue(userId);
     }
 
     if (inventoryUser?.username) {
-      config.headers["X-Inventory-Username"] = inventoryUser.username;
+      config.headers["X-Inventory-Username"] = encodeHeaderValue(
+        inventoryUser.username,
+      );
     }
 
     // 🔥 تحديث baseURL في كل طلب (لو تغير المستخدم)

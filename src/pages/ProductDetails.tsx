@@ -220,9 +220,9 @@ const transfersColumns = [
     return (
       <DashboardLayout>
         <Card>
-          <CardHeader className="flex flex-row-reverse justify-between items-center">
+          <CardHeader className="flex flex-col-reverse items-stretch gap-3 sm:flex-row-reverse sm:items-center sm:justify-between">
             <Button
-              className=""
+              className="w-full sm:w-auto"
               variant="outline"
               onClick={() => window.history.back()}
             >
@@ -231,16 +231,16 @@ const transfersColumns = [
             </Button>
             <CardTitle>المعلومات الأساسية</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
+          <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {formData &&
               Object.entries(formData).map(([key, value]) => {
                 if (key === "id") return null;
                 return (
                   <p
                     key={key}
-                    className="flex gap-2 relative group mb-4 items-end"
+                    className="group relative mb-0 flex min-w-0 flex-col gap-1 sm:flex-row sm:items-end"
                   >
-                    <label className="block font-bold w-36">
+                    <label className="block w-full font-bold sm:w-36">
                       {key == "payPrice"
                         ? "سعر الشراء"
                         : key == "unit"
@@ -268,21 +268,21 @@ const transfersColumns = [
                         type="text"
                         value={new Date(value as any).toLocaleString("en-GB")}
                         onChange={(e) => handleChange(key, e.target.value)}
-                        className="bg-transparent border-b-2 border-transparent focus:border-primary-500 outline-none transition-all w-full"
+                        className="w-full min-w-0 border-b-2 border-transparent bg-transparent outline-none transition-all focus:border-primary-500"
                       />
                     ) : (
                       <input
                         type="text"
                         value={value as any}
                         onChange={(e) => handleChange(key, e.target.value)}
-                        className="bg-transparent border-b-2 border-transparent focus:border-primary-500 outline-none transition-all w-full"
+                        className="w-full min-w-0 border-b-2 border-transparent bg-transparent outline-none transition-all focus:border-primary-500"
                       />
                     )}
                     <span className="absolute bottom-0 right-0 w-full h-[2px] bg-primary-500 scale-x-0 group-hover:scale-x-100 origin-right transition-transform duration-300"></span>
                   </p>
                 );
               })}
-            <div className="col-span-2 w-full grid grid-cols-2 gap-4">
+            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2">
               {isDirty && isFormValid && (
                 <Button
                   onClick={() => mutation.mutate(formData)}
@@ -292,7 +292,7 @@ const transfersColumns = [
                 </Button>
               )}
               <Button
-                className={!isDirty ? "col-span-2" : ""}
+                className={!isDirty ? "sm:col-span-2" : ""}
                 variant="destructive"
                 onClick={() =>
                   window.confirm("هل انت متأكد من عملية الحذف")
@@ -330,15 +330,15 @@ const transfersColumns = [
           <CardHeader>
             <CardTitle>جداول البيانات</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-row flex-wrap gap-4">
+          <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <DataTable
-              className="w-full md:w-[48%]"
+              className="w-full"
               title="عمليات الشراء"
               data={data ? Object.values(data.transfers) : []}
               columns={transfersColumns}
             />
             <DataTable
-              className="w-full md:w-[48%]"
+              className="w-full"
               title="عمليات الشراء"
               data={data ? Object.values(data.purchases) : []}
               columns={purchasesColumns}
@@ -349,7 +349,7 @@ const transfersColumns = [
               }}
             />
             <DataTable
-              className="w-full md:w-[48%]"
+              className="w-full"
               title="عمليات البيع"
               data={data ? Object.values(data.sells) : []}
               columns={salesColumns}

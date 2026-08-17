@@ -22,7 +22,7 @@ export default function PopupForm({
       {/* الزر المحفز */}
       <div
         onClick={() => setIsOpen(true)}
-        className="inline-block cursor-pointer"
+        className="inline-block w-full cursor-pointer sm:w-auto"
       >
         {trigger}
       </div>
@@ -41,26 +41,26 @@ export default function PopupForm({
 
             {/* محتوى البوب أب */}
             <motion.div
-              className="fixed inset-0 z-50 flex items-center justify-center px-4"
+              className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-3 py-4 sm:items-center sm:px-4 sm:py-8"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
               <motion.div
-                className="bg-gradient-to-bl from-primary-50 to-background w-full max-w-lg rounded-2xl shadow-xl p-6 relative"
+                className="relative max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-hidden rounded-xl bg-gradient-to-bl from-primary-50 to-background p-4 shadow-xl sm:rounded-2xl sm:p-6"
                 initial={{ scale: 0.9, y: 40, opacity: 0 }}
                 animate={{ scale: 1, y: 0, opacity: 1 }}
                 exit={{ scale: 0.9, y: 40, opacity: 0 }}
                 transition={{ duration: 0.25, ease: "easeOut" }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex flex-row justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold text-foreground">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <h2 className="break-words text-lg font-semibold text-foreground sm:text-xl">
                     {title}
                   </h2>
                   <button
                     onClick={() => setIsOpen(false)}
-                    className="text-gray-400 hover:text-red-500 transition"
+                    className="shrink-0 text-gray-400 transition hover:text-red-500"
                     aria-label="إغلاق"
                   >
                     <X size={24} />
@@ -68,7 +68,7 @@ export default function PopupForm({
                 </div>
 
                 {/* المحتوى */}
-                <div className="space-y-4 p-1 max-h-[80vh] overflow-y-auto">
+                <div className="max-h-[calc(100dvh-8rem)] space-y-4 overflow-y-auto overflow-x-hidden p-1">
                   {children}
                 </div>
               </motion.div>

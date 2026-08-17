@@ -153,8 +153,8 @@ export default function UpdateAccountForm({ account, onClose }: UpdateAccountFor
                 />
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="sm:col-span-2">
                     <FormInput
                         label="الرصيد الافتتاحي"
                         name="openingBalance"

@@ -391,7 +391,7 @@ export default function Purchases() {
                     <button
                       key={product.id}
                       type="button"
-                      className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-right text-sm last:border-b-0 hover:bg-accent"
+                      className="flex w-full flex-col gap-1 border-b px-3 py-2 text-right text-sm last:border-b-0 hover:bg-accent sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                       onClick={() => addProduct(product)}
                     >
                       <span>
@@ -415,8 +415,8 @@ export default function Purchases() {
                 selectedProducts.map((product) => (
                   <div key={product.id} className="rounded-md border p-3">
                     <div className="mb-3 flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold">{product.name}</p>
+                      <div className="min-w-0">
+                        <p className="break-words font-semibold">{product.name}</p>
                         <p className="text-sm text-muted-foreground">
                           {product.code} | {product.warehouse}
                         </p>
@@ -425,6 +425,7 @@ export default function Purchases() {
                         type="button"
                         size="icon"
                         variant="destructive"
+                        className="shrink-0"
                         onClick={() => removeProduct(product.id)}
                       >
                         <Trash2 className="h-4 w-4" />

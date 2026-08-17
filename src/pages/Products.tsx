@@ -174,23 +174,23 @@ export default function Products() {
             </label> */}
 
             {isAdmin && (
-            <div className="flex w-full items-center gap-2">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
               <span>السعر:</span>
               <FormInput
                 label=""
                 type="number"
-                className="border rounded px-2 py-1"
+                className="rounded border px-2 py-1"
                 value={priceRange[0]}
                 onChange={(e) =>
                   setPriceRange([Number(e.target.value), priceRange[1]])
                 }
                 placeholder="min"
               />
-              -
+              <span className="hidden sm:inline">-</span>
               <FormInput
                 label=""
                 type="number"
-                className="border rounded px-2 py-1"
+                className="rounded border px-2 py-1"
                 value={priceRange[1]}
                 onChange={(e) =>
                   setPriceRange([priceRange[0], Number(e.target.value)])

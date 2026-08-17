@@ -269,15 +269,15 @@ export default function GeneralLedger() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => navigate(-1)}>
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+            <Button variant="outline" onClick={() => navigate(-1)} className="w-full sm:w-auto">
               <ArrowLeft className="ml-2 h-4 w-4" />
               رجوع
             </Button>
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-start font-normal">
+                <Button variant="outline" className="w-full justify-start font-normal sm:w-auto">
                   <CalendarIcon className="ml-2 h-4 w-4" />
                   {dateRange?.from ? (
                     dateRange.to ? (
@@ -312,7 +312,7 @@ export default function GeneralLedger() {
               مسح الفلتر
             </Button>
 
-            <div className="w-full lg:w-72">
+            <div className="w-full sm:w-72">
               <Select
                 value={selectedAccountId}
                 onValueChange={(value) => {

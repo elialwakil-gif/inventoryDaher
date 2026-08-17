@@ -675,15 +675,15 @@ export default function FinancialStatement() {
           <CardHeader className="flex flex-col gap-4">
             <div>
               <h1 className="mb-4 text-2xl font-bold">العمليات المالية</h1>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
                 <AddBalanceForm isOpen={isOpen} setIsOpen={setIsOpen} />
                 <TakeBalanceForm isOpen={isOpenPay} setIsOpen={setIsOpenPay} />
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
               <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="نوع العملية" />
                 </SelectTrigger>
                 <SelectContent>
@@ -696,7 +696,7 @@ export default function FinancialStatement() {
               </Select>
 
               <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="العملة" />
                 </SelectTrigger>
                 <SelectContent>
@@ -715,7 +715,7 @@ export default function FinancialStatement() {
                   setDisplayCurrency(value as "dual" | "USD" | "SYP")
                 }
               >
-                <SelectTrigger className="w-44">
+                <SelectTrigger className="w-full sm:w-44">
                   <SelectValue placeholder="طريقة العرض" />
                 </SelectTrigger>
                 <SelectContent>
@@ -729,7 +729,7 @@ export default function FinancialStatement() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-[260px] justify-start text-left font-normal"
+                    className="w-full justify-start text-left font-normal sm:w-[260px]"
                   >
                     <CalendarIcon className="ml-2 h-4 w-4" />
                     {dateRange?.from ? (
@@ -759,6 +759,7 @@ export default function FinancialStatement() {
 
               <Button
                 variant="ghost"
+                className="w-full sm:w-auto"
                 onClick={() => {
                   setDateRange(undefined);
                   setSelectedType("all");

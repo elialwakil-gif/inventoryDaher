@@ -39,6 +39,16 @@ const defaultUserPermissions: AppPermission[] = [
   "products",
 ];
 const defaultDriverPermissions: AppPermission[] = ["driver-sales"];
+const ARABIC_USERNAME_CHAR_PATTERN =
+  /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const ARABIC_USERNAME_CHARS_PATTERN =
+  /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+/g;
+
+const hasArabicUsernameChars = (value: string) =>
+  ARABIC_USERNAME_CHAR_PATTERN.test(value);
+
+const removeArabicUsernameChars = (value: string) =>
+  value.replace(ARABIC_USERNAME_CHARS_PATTERN, "");
 
 const normalizeFormPermissions = (user?: InventoryUserRecord | null) => {
   const permissions = getUserPermissions(user || null);
@@ -66,6 +76,7 @@ export default function AddUserForm({
   );
 
   const selectedPermissions = role === "admin" ? allPagePermissions : permissions;
+  const usernameHasArabicChars = hasArabicUsernameChars(username);
 
   const resetForm = () => {
     setUsername("");
@@ -153,6 +164,15 @@ export default function AddUserForm({
   const selectAll = () => setPermissions(allPagePermissions);
   const clearAll = () => setPermissions([]);
   const isPending = addUserMutation.isPending || updateUserMutation.isPending;
+  const handleUsernameChange = (value: string) => {
+    if (hasArabicUsernameChars(value)) {
+      setUsername(removeArabicUsernameChars(value));
+      toast.error("اسم المستخدم يجب ألا يحتوي على أحرف عربية");
+      return;
+    }
+
+    setUsername(value);
+  };
 
   return (
     <PopupForm
@@ -172,9 +192,15 @@ export default function AddUserForm({
         className="space-y-5"
         onSubmit={(event) => {
           event.preventDefault();
+          const trimmedUsername = username.trim();
 
-          if (!username.trim()) {
+          if (!trimmedUsername) {
             toast.error("يرجى إدخال اسم المستخدم");
+            return;
+          }
+
+          if (hasArabicUsernameChars(trimmedUsername)) {
+            toast.error("اسم المستخدم يجب ألا يحتوي على أحرف عربية");
             return;
           }
 
@@ -207,7 +233,7 @@ export default function AddUserForm({
           }
 
           addUserMutation.mutate({
-            username: username.trim(),
+            username: trimmedUsername,
             password,
             role,
             permissions: selectedPermissions,
@@ -219,10 +245,17 @@ export default function AddUserForm({
           <Input
             id="user-username"
             value={username}
-            onChange={(event) => setUsername(event.target.value)}
+            onChange={(event) => handleUsernameChange(event.target.value)}
             autoComplete="off"
             disabled={isEditing}
+            dir="ltr"
+            aria-invalid={usernameHasArabicChars}
           />
+          {usernameHasArabicChars ? (
+            <p className="text-xs text-destructive">
+              اسم المستخدم يجب ألا يحتوي على أحرف عربية
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-2">

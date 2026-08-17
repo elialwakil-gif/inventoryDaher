@@ -623,7 +623,7 @@ export default function Vehicles() {
                         <button
                           key={product.id}
                           type="button"
-                          className="flex w-full items-center justify-between gap-3 border-b p-3 text-right text-sm last:border-b-0 hover:bg-muted"
+                          className="flex w-full flex-col gap-1 border-b p-3 text-right text-sm last:border-b-0 hover:bg-muted sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                           onClick={() => addLoadProduct(product)}
                         >
                           <span>
@@ -641,8 +641,8 @@ export default function Vehicles() {
                       key={product.id}
                       className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_110px_110px_40px]"
                     >
-                      <div>
-                        <p className="font-medium">{product.name}</p>
+                      <div className="min-w-0">
+                        <p className="break-words font-medium">{product.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {product.code} | المتاح:{" "}
                           {formatNumber(getAvailableQuantity(product))}
@@ -711,7 +711,7 @@ export default function Vehicles() {
                 <CardTitle className="text-lg">ملخص {selectedVehicle.vehicle.name}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3 text-sm">
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-2">
                   <span>السائق</span>
                   <strong>
                     {selectedVehicle.vehicle.driverName ||
@@ -719,15 +719,15 @@ export default function Vehicles() {
                       "غير محدد"}
                   </strong>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-2">
                   <span>الكمية الموجودة</span>
                   <strong>{formatNumber(selectedVehicle.totals.totalQuantity)}</strong>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-2">
                   <span>قيمة المخزون بيعاً</span>
                   <strong>{formatMoney(selectedVehicle.totals.stockSellValue)}</strong>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-2">
                   <span>مبيعات اليوم</span>
                   <strong>{formatMoney(selectedVehicle.totals.salesTotal)}</strong>
                 </div>

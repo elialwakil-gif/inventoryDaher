@@ -428,8 +428,8 @@ export default function CustomerDetails() {
   return (
     <DashboardLayout>
       <div className="space-y-6" dir="rtl">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">بيانات الزبون</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-bold sm:text-3xl">بيانات الزبون</h1>
           <Button onClick={() => navigate(-1)} variant="outline">
             <ArrowLeft className="ml-2 w-4 h-4" /> رجوع
           </Button>
@@ -443,7 +443,7 @@ export default function CustomerDetails() {
           <CardContent className="grid grid-cols-1 gap-4">
             <DetailsInputs customer={customer} setCustomer={setCustomer} />
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
               <Button>
                 <PDFDownloadLink
                   document={
@@ -607,7 +607,7 @@ export default function CustomerDetails() {
                 data={customerPayments}
               />
 
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
                 <div className="rounded-md border p-3">
                   <p className="text-sm text-muted-foreground">فواتير نقدية</p>
                   <p className="text-xl font-bold">{salesSummary.cash}</p>
