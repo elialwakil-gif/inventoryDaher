@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import AddUserForm from "@/components/Users/AddUserForm";
 import { DataTable } from "@/components/dashboard/DataTable";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import TrialTenantsPanel from "@/components/Trials/TrialTenantsPanel";
 import { Button } from "@/components/ui/button";
 import ConfirmForm from "@/components/ui/custom/ConfirmForm";
 import {
@@ -38,6 +39,22 @@ function getStoredUsername() {
   }
 }
 
+function getStoredTenantId() {
+  try {
+    const storedUser = localStorage.getItem("InventoryUser");
+    const user = storedUser ? JSON.parse(storedUser) : null;
+
+    return (
+      user?.tenantId ||
+      user?.companyCode ||
+      localStorage.getItem("InventoryTenantId") ||
+      "default"
+    );
+  } catch {
+    return localStorage.getItem("InventoryTenantId") || "default";
+  }
+}
+
 export default function Users() {
   const queryClient = useQueryClient();
   const [addIsOpen, setAddIsOpen] = useState(false);
@@ -46,6 +63,9 @@ export default function Users() {
     null,
   );
   const currentUsername = getStoredUsername();
+  const currentTenantId = getStoredTenantId();
+  const canManageTrials =
+    currentUsername === "and" && currentTenantId === "default";
 
   const {
     data: users = [],
@@ -107,6 +127,8 @@ export default function Users() {
 
   return (
     <DashboardLayout>
+      {canManageTrials ? <TrialTenantsPanel /> : null}
+
       <DataTable
         title="المستخدمون"
         description={
