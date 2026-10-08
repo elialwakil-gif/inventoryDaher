@@ -1,6 +1,5 @@
 import { useWarehouseContext } from "@/contexts/WarehouseContexts";
 import FormInput from "../ui/custom/FormInput";
-import { useState } from "react";
 
 interface Props {
   label?: string
@@ -10,7 +9,6 @@ interface Props {
 
 export default function WarehouseSelect({ value, onChange, label }: Props) {
   const { data: warehouses = [], isLoading } = useWarehouseContext();
-  const [tempValue, setTempValue] = useState("");
 
   const isOther = value === "other";
 

@@ -182,8 +182,8 @@ export function ChartContainer({
                   data={pieData}
                   cx="50%"
                   cy="50%"
-                  outerRadius={120}
-                  innerRadius={50}
+                  outerRadius="72%"
+                  innerRadius="35%"
                   cornerRadius={8}
                   paddingAngle={4}
                   dataKey="value"
@@ -200,7 +200,7 @@ export function ChartContainer({
             {/* هنا تضيف النص أسفل الرسم */}
             <p
               className="text-foreground/80"
-              style={{ marginTop: "5px", fontWeight: "bold", fontSize: "22px" }}
+              style={{ marginTop: "5px", fontWeight: "bold", fontSize: "18px" }}
             >
               {desc}
             </p>
@@ -299,7 +299,7 @@ export function ChartContainer({
                 <Legend />
                 {users.map(user => (
                   <Bar key={user} dataKey={user} stackId="a" fill={getColor(user)}>
-                    <LabelList dataKey={user} content={({ value }: any) => (
+                    <LabelList dataKey={user} content={() => (
                       <text
                         x={0}
                         y={0}
@@ -326,7 +326,7 @@ export function ChartContainer({
         case "area":
           return (
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+              <AreaChart data={data} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorPrimary" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
@@ -386,9 +386,9 @@ export function ChartContainer({
   };
 
   return (
-    <Card className={`chart-container ${className}`}>
+    <Card className={`chart-container min-w-0 overflow-hidden ${className || ""}`}>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <CardTitle className="break-words text-lg sm:text-xl">{title}</CardTitle>
       </CardHeader>
       <CardContent>{renderChart()}</CardContent>
     </Card>

@@ -255,7 +255,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
       current
         .map((p) =>
           p.id === id
-            ? { ...p, sellPrice: nextPrice, selectedPriceType: "custom" }
+            ? { ...p, sellPrice: nextPrice, selectedPriceType: "custom" as const }
             : p,
         )
         .filter((p) => p.qty > 0),
@@ -294,7 +294,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
   }, [setAmount, total]);
 
   return (
-    <div className="rounded-lg bg-white p-3 shadow sm:p-4" dir="rtl">
+    <div className="overflow-hidden rounded-lg bg-white p-3 shadow sm:p-4" dir="rtl">
       <h3 className="mb-3 text-lg font-bold">اختيار المنتجات</h3>
 
       <div
@@ -361,8 +361,8 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
             {selectedProducts.map((p) => (
               <div key={p.id} className="rounded-md border p-3">
                 <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{p.name}</p>
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold">{p.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {p.code} | {p.warehouse}
                     </p>
@@ -371,6 +371,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                     type="button"
                     variant="destructive"
                     size="icon"
+                    className="shrink-0"
                     onClick={() => removeProduct(p.id)}
                   >
                     <X className="h-4 w-4" />

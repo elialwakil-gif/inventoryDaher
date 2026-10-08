@@ -1,4 +1,7 @@
 import AccountSelect from "@/components/Accounts/AccountSelect";
+import GoodsSettlementForm from "@/components/Payments/GoodsSettlementForm";
+import GoodsSettlementActions from "@/components/Payments/GoodsSettlementActions";
+import { goodsPaymentDetails, goodsPaymentLabel } from "@/lib/goodsSettlements";
 import DetailsInputs from "@/components/Customers/DetailsInputs";
 import { DataTable } from "@/components/dashboard/DataTable";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -39,11 +42,6 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numberValue) ? numberValue : 0;
 };
 
-const formatAmount = (value: unknown) =>
-  toNumber(value).toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-  });
-
 const formatDualCurrency = (usd: unknown, syp?: unknown) => {
   const sypAmount = toNumber(syp);
   const usdText = formatCurrencyAmount(toNumber(usd), "USD");
@@ -59,6 +57,7 @@ const getPaymentStatusLabel = (status?: string) => {
 };
 
 const getSupplierPaymentMovementLabel = (payment: any) => {
+  if (payment?.settlementMethod === "goods") return goodsPaymentLabel(payment);
   if (payment?.purchaseId && payment?.type === "expense") {
     return "تسديد فاتورة شراء";
   }
@@ -216,6 +215,7 @@ export default function SupplierDetails() {
     { label: "الفاتورة", key: "invoiceReference" },
     { label: "المبلغ", key: "amountDisplay" },
     { label: "العملة", key: "currency" },
+    { label: "تفاصيل البضاعة", key: "goodsDetails" },
     { label: "الوصف", key: "note" },
     { label: "التاريخ", key: "date" },
   ];
@@ -261,7 +261,7 @@ export default function SupplierDetails() {
                       ? ` (${formatExchangeRate(payment.exchangeRate)})`
                       : "";
 
-                    return `${formatDualCurrency(
+                    return `${payment.settlementMethod === "goods" ? `${goodsPaymentLabel(payment)}: ` : ""}${formatDualCurrency(
                       Math.abs(toNumber(payment.amountUSD ?? payment.amount)),
                       Math.abs(toNumber(payment.amountSYP)),
                     )}${exchangeRateText} - ${
@@ -286,9 +286,9 @@ export default function SupplierDetails() {
 
           return {
             ...purchase,
-            status:
-              purchase.paymentStatusLabel ||
-              getPaymentStatusLabel(purchase.paymentStatus),
+            status: purchase.paymentStatus === "cash" && invoicePayments.some((payment) => payment.settlementMethod === "goods" && payment.status !== "reversed" && !payment.reversalOf)
+              ? "مسددة (تتضمن بضاعة)"
+              : purchase.paymentStatusLabel || getPaymentStatusLabel(purchase.paymentStatus),
             totalPrice,
             totalPriceDisplay: formatDualCurrency(totalPrice, totalSYP),
             paidAmount,
@@ -321,6 +321,7 @@ export default function SupplierDetails() {
             Math.abs(toNumber(payment.amountSYP)),
           ),
           currency: payment.currency || "-",
+          goodsDetails: payment.settlementMethod === "goods" ? goodsPaymentDetails(payment) : "-",
         }))
         .sort((a, b) => parseDate(b.date) - parseDate(a.date)),
     [data],
@@ -565,8 +566,8 @@ export default function SupplierDetails() {
   return (
     <DashboardLayout>
       <div className="space-y-6" dir="rtl">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">بيانات المورد</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-bold sm:text-3xl">بيانات المورد</h1>
           <Button onClick={() => navigate(-1)} variant="outline">
             <ArrowLeft className="ml-2 w-4 h-4" /> رجوع
           </Button>
@@ -584,6 +585,7 @@ export default function SupplierDetails() {
             />
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <GoodsSettlementForm partyType="supplier" party={{ ...supplier, id: getCurrentSupplierId() }} />
               <PopupForm
                 title="دفعة من المورد"
                 trigger={
@@ -754,11 +756,12 @@ export default function SupplierDetails() {
                 title="الدفعات"
                 columns={paymentsColumns}
                 data={supplierPayments}
+                renderRowActions={(row) => <GoodsSettlementActions payment={row as any} partyName={supplier.name || ""} />}
               />
 
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
                 <div className="rounded-md border p-3">
-                  <p className="text-sm text-muted-foreground">فواتير نقدية</p>
+                  <p className="text-sm text-muted-foreground">فواتير مسددة</p>
                   <p className="text-xl font-bold">{purchasesSummary.cash}</p>
                 </div>
                 <div className="rounded-md border p-3">
@@ -789,6 +792,7 @@ export default function SupplierDetails() {
                 data={supplierPurchases}
                 renderRowActions={(row) => (
                   <div className="flex gap-2">
+                    <GoodsSettlementForm partyType="supplier" party={{ ...supplier, id: getCurrentSupplierId() }} invoice={row as any} />
                     <PopupForm
                       title="تسديد فاتورة شراء"
                       isOpen={invoicePaymentOpenId === row.id}

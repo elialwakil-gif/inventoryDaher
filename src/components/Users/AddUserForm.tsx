@@ -12,6 +12,7 @@ import {
   addUser,
   InventoryUserRecord,
   updateUser,
+  type UpdateUserPayload,
 } from "@/services/users";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,7 +39,17 @@ const defaultUserPermissions: AppPermission[] = [
   "dashboard",
   "products",
 ];
-const defaultDriverPermissions: AppPermission[] = ["driver-sales"];
+const defaultDriverPermissions: AppPermission[] = ["driver-sales", "driver-statements"];
+const ARABIC_USERNAME_CHAR_PATTERN =
+  /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const ARABIC_USERNAME_CHARS_PATTERN =
+  /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+/g;
+
+const hasArabicUsernameChars = (value: string) =>
+  ARABIC_USERNAME_CHAR_PATTERN.test(value);
+
+const removeArabicUsernameChars = (value: string) =>
+  value.replace(ARABIC_USERNAME_CHARS_PATTERN, "");
 
 const normalizeFormPermissions = (user?: InventoryUserRecord | null) => {
   const permissions = getUserPermissions(user || null);
@@ -61,16 +72,21 @@ export default function AddUserForm({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("user");
+  const [commissionRate, setCommissionRate] = useState("0");
+  const [commissionEffectiveFrom, setCommissionEffectiveFrom] = useState("");
   const [permissions, setPermissions] = useState<AppPermission[]>(
     defaultUserPermissions,
   );
 
   const selectedPermissions = role === "admin" ? allPagePermissions : permissions;
+  const usernameHasArabicChars = hasArabicUsernameChars(username);
 
   const resetForm = () => {
     setUsername("");
     setPassword("");
     setRole("user");
+    setCommissionRate("0");
+    setCommissionEffectiveFrom("");
     setPermissions(defaultUserPermissions);
   };
 
@@ -85,6 +101,8 @@ export default function AddUserForm({
     setUsername(user.username || "");
     setPassword("");
     setRole(user.role || "user");
+    setCommissionRate(String(user.commissionRate ?? 0));
+    setCommissionEffectiveFrom("");
     setPermissions(
       user.role === "admin"
         ? allPagePermissions
@@ -102,16 +120,12 @@ export default function AddUserForm({
     },
     onError: (error) => {
       console.error(error);
-      toast.error("حدث خطأ أثناء إضافة المستخدم");
+      toast.error((error as Error).message);
     },
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: (payload: {
-      role: string;
-      permissions: AppPermission[];
-      password?: string;
-    }) => updateUser(userId, payload),
+    mutationFn: (payload: UpdateUserPayload) => updateUser(userId, payload),
     onSuccess: () => {
       toast.success("تم تعديل المستخدم بنجاح");
       resetForm();
@@ -120,7 +134,7 @@ export default function AddUserForm({
     },
     onError: (error) => {
       console.error(error);
-      toast.error("حدث خطأ أثناء تعديل المستخدم");
+      toast.error((error as Error).message);
     },
   });
 
@@ -153,6 +167,15 @@ export default function AddUserForm({
   const selectAll = () => setPermissions(allPagePermissions);
   const clearAll = () => setPermissions([]);
   const isPending = addUserMutation.isPending || updateUserMutation.isPending;
+  const handleUsernameChange = (value: string) => {
+    if (hasArabicUsernameChars(value)) {
+      setUsername(removeArabicUsernameChars(value));
+      toast.error("اسم المستخدم يجب ألا يحتوي على أحرف عربية");
+      return;
+    }
+
+    setUsername(value);
+  };
 
   return (
     <PopupForm
@@ -172,9 +195,15 @@ export default function AddUserForm({
         className="space-y-5"
         onSubmit={(event) => {
           event.preventDefault();
+          const trimmedUsername = username.trim();
 
-          if (!username.trim()) {
+          if (!trimmedUsername) {
             toast.error("يرجى إدخال اسم المستخدم");
+            return;
+          }
+
+          if (hasArabicUsernameChars(trimmedUsername)) {
+            toast.error("اسم المستخدم يجب ألا يحتوي على أحرف عربية");
             return;
           }
 
@@ -188,14 +217,21 @@ export default function AddUserForm({
             return;
           }
 
+          if (role === "driver" && (!commissionRate.trim() || !Number.isFinite(Number(commissionRate)) || Number(commissionRate) < 0 || Number(commissionRate) > 100)) {
+            toast.error("نسبة تحصيل السائق يجب أن تكون بين 0 و100");
+            return;
+          }
+          const commissionChanged = role === "driver" && (!isEditing || user?.role !== "driver" || Number(commissionRate) !== Number(user.commissionRate ?? 0) || Boolean(commissionEffectiveFrom));
+          const commissionFields = commissionChanged ? {
+            commissionRate: Number(commissionRate),
+            ...(commissionEffectiveFrom ? { commissionEffectiveFrom: new Date(commissionEffectiveFrom).toISOString() } : {}),
+          } : {};
+
           if (isEditing) {
-            const payload: {
-              role: string;
-              permissions: AppPermission[];
-              password?: string;
-            } = {
+            const payload: UpdateUserPayload = {
               role,
               permissions: selectedPermissions,
+              ...commissionFields,
             };
 
             if (password.trim()) {
@@ -207,10 +243,11 @@ export default function AddUserForm({
           }
 
           addUserMutation.mutate({
-            username: username.trim(),
+            username: trimmedUsername,
             password,
             role,
             permissions: selectedPermissions,
+            ...commissionFields,
           });
         }}
       >
@@ -219,10 +256,17 @@ export default function AddUserForm({
           <Input
             id="user-username"
             value={username}
-            onChange={(event) => setUsername(event.target.value)}
+            onChange={(event) => handleUsernameChange(event.target.value)}
             autoComplete="off"
             disabled={isEditing}
+            dir="ltr"
+            aria-invalid={usernameHasArabicChars}
           />
+          {usernameHasArabicChars ? (
+            <p className="text-xs text-destructive">
+              اسم المستخدم يجب ألا يحتوي على أحرف عربية
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-2">
@@ -254,6 +298,11 @@ export default function AddUserForm({
         </div>
 
         <div className="space-y-3 rounded-md border bg-background p-3">
+          {role === "driver" && <div className="space-y-3 border-b pb-4" dir="rtl">
+            <div className="space-y-2"><Label htmlFor="driver-commission-rate">نسبة السائق من التحصيل النقدي (%)</Label><Input id="driver-commission-rate" type="number" min="0" max="100" step="0.01" value={commissionRate} onChange={(event) => setCommissionRate(event.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="driver-commission-effective">تاريخ سريان النسبة الجديدة</Label><Input id="driver-commission-effective" type="datetime-local" value={commissionEffectiveFrom} onChange={(event) => setCommissionEffectiveFrom(event.target.value)} /><p className="text-xs text-muted-foreground">اتركه فارغًا لتسري عند الحفظ. لكل سائق نسبته؛ تحفظ التحصيلات السابقة نسبتها وقت القبض.</p></div>
+            {user?.commissionRateHistory?.length ? <details className="text-sm"><summary className="cursor-pointer">سجل نسب السائق</summary><div className="mt-2 space-y-1">{user.commissionRateHistory.map((change) => <p key={change.id}>{change.rate}% — {new Date(change.effectiveFrom).toLocaleString("ar-SY", { timeZone: "Asia/Damascus" })}</p>)}</div></details> : null}
+          </div>}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label>الصفحات المسموحة</Label>

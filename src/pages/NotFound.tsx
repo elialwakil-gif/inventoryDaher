@@ -5,17 +5,17 @@ import { Card, CardContent } from "@/components/ui/card";
 
 const NotFound = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20 p-4">
+    <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-background to-muted/20 p-4">
       <Card className="w-full max-w-md">
         <CardContent className="pt-6 text-center">
           <div className="mb-6">
-            <div className="mx-auto h-20 w-20 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center mb-4">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-accent-500">
               <span className="text-2xl font-bold text-white">404</span>
             </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">
+            <h1 className="mb-2 text-2xl font-bold text-foreground">
               Page Not Found
             </h1>
-            <p className="text-muted-foreground mb-6">
+            <p className="mb-6 text-muted-foreground">
               The page you're looking for doesn't exist or has been moved.
             </p>
           </div>
@@ -27,7 +27,7 @@ const NotFound = () => {
                 Go to Dashboard
               </Button>
             </Link>
-            <Button variant="outline" onClick={() => window.history.back()}>
+            <Button className="w-full" variant="outline" onClick={() => window.history.back()}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Go Back
             </Button>

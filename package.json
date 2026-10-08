@@ -8,7 +8,7 @@
     "build": "vite build",
     "test": "vitest --run",
     "format.fix": "prettier --write .",
-    "typecheck": "tsc",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },

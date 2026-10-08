@@ -1,5 +1,7 @@
 import axios from "axios";
 
+const encodeHeaderValue = (value: unknown) => encodeURIComponent(String(value));
+
 /**
  * جلب رابط السيرفر من localStorage أو env
  */
@@ -46,11 +48,13 @@ apiClient.interceptors.request.use(
     const userId = inventoryUser?.id || inventoryUser?._id || inventoryUser?.username;
 
     if (userId) {
-      config.headers["X-Inventory-User-Id"] = userId;
+      config.headers["X-Inventory-User-Id"] = encodeHeaderValue(userId);
     }
 
     if (inventoryUser?.username) {
-      config.headers["X-Inventory-Username"] = inventoryUser.username;
+      config.headers["X-Inventory-Username"] = encodeHeaderValue(
+        inventoryUser.username,
+      );
     }
 
     // 🔥 تحديث baseURL في كل طلب (لو تغير المستخدم)

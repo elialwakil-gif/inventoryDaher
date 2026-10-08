@@ -59,7 +59,7 @@ export default function TakeBalanceForm({
         title="دفع من الصندوق"
         trigger={
           <Button
-            className={className}
+            className={`w-full sm:w-auto ${className || ""}`}
             onClick={(e) => {
               setIsOpen(true);
               e.stopPropagation();

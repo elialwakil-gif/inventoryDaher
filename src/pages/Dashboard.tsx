@@ -31,7 +31,7 @@ export default function Dashboard() {
   });
 
   // ✅ Query Keys تشمل الشهر والسنة
-  const { data: sells, isLoading: sellsLoading } = useQuery({
+  useQuery({
     queryKey: ["sells-table", balanceDate.month, balanceDate.year],
     queryFn: () => getAllSells(),
   });
@@ -51,7 +51,7 @@ export default function Dashboard() {
     queryFn: getAllSupplier,
   });
 
-  const { data: customer, isLoading: customerLoading } = useQuery({
+  const { data: customer } = useQuery({
     queryKey: ["customer-table"],
     queryFn: getAllCustomer,
   });
@@ -161,7 +161,6 @@ export default function Dashboard() {
 
   // ✅ جلب آخر العمليات
   const lastPayments = [...(paymentsWithSupplier || [])].reverse().slice(0, 5);
-  const lastCustomers = [...(customer || [])].reverse().slice(0, 5);
 
   return (
     <DashboardLayout>

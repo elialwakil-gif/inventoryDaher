@@ -31,6 +31,7 @@ export type AppPermission =
   | "sell-product"
   | "vehicles"
   | "driver-sales"
+  | "driver-statements"
   | "quotations"
   | "material-reservations"
   | "suppliers"
@@ -127,6 +128,13 @@ export const navigationGroups: NavigationItem[] = [
     icon: ReceiptText,
     allowed: ["admin"],
     permission: "quotations",
+  },
+  {
+    name: "Driver Financial Statement",
+    href: "/driver-statements",
+    icon: FileText,
+    allowed: ["admin", "driver"],
+    permission: "driver-statements",
   },
   {
     name: "Material Reservations",
@@ -250,7 +258,13 @@ export function getUserPermissions(user: InventoryUserWithPermissions | null) {
   const permissions =
     user.permissions || user.allowedPages || user.pagePermissions || [];
 
-  return Array.isArray(permissions) ? permissions : [];
+  if (!Array.isArray(permissions)) return [];
+  // Existing driver accounts already have access to their own sales. Their
+  // statement is the same scope, including accounts stored before this page.
+  if (user.role === "driver" && permissions.includes("driver-sales") && !permissions.includes("driver-statements")) {
+    return [...permissions, "driver-statements"];
+  }
+  return permissions;
 }
 
 export function hasExplicitPermissions(

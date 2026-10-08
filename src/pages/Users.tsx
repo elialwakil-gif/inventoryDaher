@@ -85,6 +85,7 @@ export default function Users() {
         id: user.id || user._id || user.username,
         username: user.username,
         role: user.role,
+        commissionSummary: user.role === "driver" ? `${user.commissionRate ?? 0}%` : "—",
         permissionsSummary: formatPermissions(user, permissionLabels),
         createdAt: user.createdAt || "",
         originalUser: user,
@@ -101,6 +102,7 @@ export default function Users() {
     { key: "id", label: "المعرف", sortable: true, hidden: true },
     { key: "username", label: "اسم المستخدم", sortable: true },
     { key: "role", label: "الدور", sortable: true },
+    { key: "commissionSummary", label: "نسبة التحصيل", sortable: true },
     { key: "permissionsSummary", label: "الصفحات", sortable: true },
     { key: "createdAt", label: "تاريخ الإنشاء", sortable: true },
   ];
@@ -128,7 +130,7 @@ export default function Users() {
           const deleteDisabled = isCurrentUser || isLastAdmin;
 
           return (
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2">
               <Button
                 type="button"
                 variant="outline"

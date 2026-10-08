@@ -8,6 +8,7 @@ const Dashboard = React.lazy(() => import("@/pages/Dashboard"));
 const SellProduct = React.lazy(() => import("@/pages/SellProduct"));
 const Vehicles = React.lazy(() => import("@/pages/Vehicles"));
 const DriverSales = React.lazy(() => import("@/pages/DriverSales"));
+const DriverStatements = React.lazy(() => import("@/pages/DriverStatements"));
 const Quotations = React.lazy(() => import("@/pages/Quotations"));
 const Home = React.lazy(() => import("@/pages/Home"));
 const NotFound = React.lazy(() => import("@/pages/NotFound"));
@@ -63,6 +64,7 @@ export const routesConfig = [
   { path: "/sellProduct", element: protect(<SellProduct />, ["admin"], "sell-product") },
   { path: "/vehicles", element: protect(<Vehicles />, ["admin"], "vehicles") },
   { path: "/driver-sales", element: protect(<DriverSales />, ["admin", "driver"], "driver-sales") },
+  { path: "/driver-statements", element: protect(<DriverStatements />, ["admin", "driver"], "driver-statements") },
   { path: "/quotations", element: protect(<Quotations />, ["admin"], "quotations") },
   { path: "/material-reservations", element: protect(<MaterialReservations />, ["admin"], "material-reservations") },
   { path: "/financialStatement", element: protect(<FinancialStatement />, ["admin"], "financial-statement") },

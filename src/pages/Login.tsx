@@ -52,8 +52,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-gray-200 to-gray-100 px-4">
-      <Card className="w-full max-w-md p-8 rounded-2xl shadow-2xl backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-white/20 space-y-6 transition-all duration-300">
+    <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-white via-gray-200 to-gray-100 px-3 py-6 sm:px-4">
+      <Card className="w-full max-w-md space-y-6 rounded-xl border border-white/20 bg-white/90 p-5 shadow-2xl backdrop-blur-xl transition-all duration-300 dark:bg-gray-900/90 sm:rounded-2xl sm:p-8">
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-extrabold bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">
             Daher-Net

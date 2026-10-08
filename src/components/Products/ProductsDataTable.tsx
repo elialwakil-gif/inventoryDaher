@@ -49,13 +49,13 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
         isLoading={isLoading}
         title="قائمة المنتجات"
         titleButton={
-          <div className="flex flex-row gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <Button
             onClick={() => {
               setEditRow(null);
               setOpenForm(true);
             }}
-            className=""
+            className="w-full sm:w-auto"
           >
             إضافة منتج
           </Button>
@@ -64,6 +64,7 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
           <Button
             variant="outline"
             onClick={() => setOpenBulkPriceIncrease(true)}
+            className="w-full sm:w-auto"
            >
             زيادة الاسعار بنسبة محددة
           </Button>
@@ -87,9 +88,10 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
               : ""
         }
         renderRowActions={(row) => (
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             <Button
               variant="default"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 setEditRow(row);
@@ -101,6 +103,7 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
 
             <Button
               variant="outline"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 navigate("/productDetails", { state: row });
@@ -111,6 +114,7 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
 
             <Button
               variant="secondary"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 setProductRow(row);

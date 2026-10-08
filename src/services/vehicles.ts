@@ -48,13 +48,29 @@ export interface UpdateVehiclePayload extends Partial<
 }
 
 export interface LoadVehiclePayload {
+  requestId?: string;
   sourceWarehouse: string;
+  sourceWarehouseId?: string;
   note?: string;
   items: Array<{
     productId: string;
     quantity: number;
     sellPrice?: number;
   }>;
+}
+
+// Loading stock requires a successful current server read, because offline product
+// cache may contain quantities or warehouse labels from before the last transfer.
+export async function getVehicleLoadProducts(): Promise<Product[]> {
+  try {
+    const response = await apiClient.get("/api/products", { params: { pricing: "full" } });
+    const data = response.data;
+    const products = Array.isArray(data) ? data : data?.products ?? data?.data;
+    if (!Array.isArray(products)) throw new Error("صيغة بيانات المنتجات غير صحيحة");
+    return products;
+  } catch (error: any) {
+    throw createServiceError(error, "تعذر تحديث منتجات التحميل. أعد المحاولة.");
+  }
 }
 
 const normalizeVehicleSummaries = (data: any): VehicleSummary[] => {

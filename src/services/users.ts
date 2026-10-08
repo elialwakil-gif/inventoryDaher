@@ -11,6 +11,9 @@ export interface InventoryUserRecord {
   vehicleName?: string;
   createdAt?: string;
   updatedAt?: string;
+  commissionRate?: number;
+  commissionEffectiveFrom?: string;
+  commissionRateHistory?: Array<{ id: string; rate: number; effectiveFrom: string; createdAt: string; createdBy: string }>;
 }
 
 export interface CreateUserPayload {
@@ -18,12 +21,16 @@ export interface CreateUserPayload {
   password: string;
   role: string;
   permissions: AppPermission[];
+  commissionRate?: number;
+  commissionEffectiveFrom?: string;
 }
 
 export interface UpdateUserPayload {
   role: string;
   permissions: AppPermission[];
   password?: string;
+  commissionRate?: number;
+  commissionEffectiveFrom?: string;
 }
 
 function normalizeUsersResponse(data: any): InventoryUserRecord[] {
@@ -50,7 +57,7 @@ export async function addUser(payload: CreateUserPayload) {
     return response.data;
   } catch (err) {
     console.error("Error while adding user:", err);
-    throw new Error("حدث خطأ أثناء إضافة المستخدم");
+    throw new Error((err as any)?.response?.data?.message || (err as any)?.response?.data?.error || "حدث خطأ أثناء إضافة المستخدم");
   }
 }
 
@@ -63,7 +70,7 @@ export async function updateUser(
     return response.data;
   } catch (err) {
     console.error("Error while updating user:", err);
-    throw new Error("حدث خطأ أثناء تعديل المستخدم");
+    throw new Error((err as any)?.response?.data?.message || (err as any)?.response?.data?.error || "حدث خطأ أثناء تعديل المستخدم");
   }
 }
 

@@ -39,7 +39,7 @@ export default function PaymentTypeSelector({
   ] as const;
 
   return (
-    <div className="grid grid-cols-3 gap-2 md:col-span-2">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:col-span-2">
       <div className="col-span-3 font-medium mb-1">طريقة دفع المبلغ المعاد</div>
 
       {options.map((opt) => (

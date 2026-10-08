@@ -44,7 +44,7 @@ const Categories = () => {
                 </p>
               </div>
 
-              <div className="flex w-full gap-2 sm:w-auto">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 {/* Search */}
                 <div className="relative w-full sm:w-[260px]">
                   <Search
@@ -83,13 +83,13 @@ const Categories = () => {
                     className="group relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg"
                   >
                     <CardHeader className="flex flex-row items-start justify-between gap-2">
-                      <div>
-                        <CardTitle className="text-lg font-semibold">
+                      <div className="min-w-0">
+                        <CardTitle className="break-words text-lg font-semibold">
                           {categoryName}
                         </CardTitle>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-2">
                         <Badge
                           //variant={products[0]?.isActive ? "default" : "secondary"}
                         >

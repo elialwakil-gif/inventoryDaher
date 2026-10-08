@@ -1,7 +1,4 @@
-import { motion } from "framer-motion";
-import { useMemo } from "react";
 import ClickSpark from "./ReactPits/Clic.kSpark.tsx";
-import Threads from "./ReactPits/Threads.tsx";
 
 export default function ScreenWrapper({ title, children }: any) {
   return (

@@ -204,15 +204,15 @@ export default function SellDetails() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 p-6 max-w-5xl mx-auto">
+      <div className="mx-auto w-full max-w-5xl space-y-4 sm:space-y-6 sm:p-6">
         <Card>
-          <CardHeader className="flex justify-between flex-row items-center gap-4">
-            <CardTitle className="text-2xl font-semibold">
+          <CardHeader className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-xl font-semibold sm:text-2xl">
               اجراءات الفاتورة
             </CardTitle>
             <Button
               onClick={() => navigate(-1)}
-              className="w-24"
+              className="w-full sm:w-24"
               variant="outline"
             >
               <ArrowLeft className="" /> رجوع
@@ -290,13 +290,13 @@ export default function SellDetails() {
 
         {/* 🧾 رأس الفاتورة */}
         <Card className="shadow-md">
-          <CardHeader className="flex justify-between items-center gap-4">
-            <CardTitle className="text-2xl font-semibold">
+          <CardHeader className="flex items-start gap-4">
+            <CardTitle className="text-xl font-semibold sm:text-2xl">
               تفاصيل الفاتورة
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
               <div>
                 <span className="text-muted-foreground">اسم الزبون:</span>
                 <p className="font-medium">{sell.customerName}</p>
@@ -339,7 +339,7 @@ export default function SellDetails() {
 
         {/* 📦 جدول المنتجات */}
         <Card className="shadow-md">
-          <CardHeader className="flex justify-between items-center">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-xl font-semibold">
               المنتجات المباعة
             </CardTitle>
@@ -347,6 +347,7 @@ export default function SellDetails() {
               variant="outline"
               onClick={handleSaveChanges}
               disabled={updateSellMutation.isPending}
+              className="w-full sm:w-auto"
             >
               {updateSellMutation.isPending ? (
                 "جاري الحفظ..."
@@ -358,6 +359,53 @@ export default function SellDetails() {
             </Button>
           </CardHeader>
           <CardContent>
+            <div className="space-y-3 md:hidden">
+              {products.map((p, idx) => (
+                <div key={idx} className="rounded-md border p-3">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold">{p.name || "-"}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {p.code || "-"}
+                      </p>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => handleDelete(idx)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <label className="space-y-1 text-sm">
+                      <span className="text-muted-foreground">السعر</span>
+                      <input
+                        type="number"
+                        value={p.sellPrice}
+                        onChange={(e) => handleChange(e, idx, "sellPrice")}
+                        className="h-10 w-full rounded-md border bg-background px-3 text-right"
+                      />
+                    </label>
+                    <label className="space-y-1 text-sm">
+                      <span className="text-muted-foreground">الكمية</span>
+                      <input
+                        type="number"
+                        value={p.qty}
+                        onChange={(e) => handleChange(e, idx, "qty")}
+                        className="h-10 w-full rounded-md border bg-background px-3 text-right"
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3 font-semibold">
+                    <span>الإجمالي</span>
+                    <span>{(p.sellPrice * p.qty).toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -419,33 +467,34 @@ export default function SellDetails() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 
         {/* 💰 ملخص الفاتورة */}
         <Card className="shadow-md">
           <CardContent className="space-y-2 pt-4">
-            <div className="flex justify-between">
+            <div className="flex flex-wrap justify-between gap-2">
               <span>المجموع:</span>
               <span className="font-medium">
                 {productsSubtotal.toLocaleString()}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-wrap justify-between gap-2">
               <span>الحسم:</span>
               <span className="font-medium">
                 {invoiceDiscount.toLocaleString()}{" "}
                 {invoiceDiscountDetails ? `(${invoiceDiscountDetails})` : ""}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-wrap justify-between gap-2">
               <span>المدفوع:</span>
               <span className="font-medium">
                 {formatDualCurrency(invoicePaid, sell?.paidSYP)}
               </span>
             </div>
             <Separator />
-            <div className="flex justify-between text-lg font-semibold">
+            <div className="flex flex-wrap justify-between gap-2 text-lg font-semibold">
               <span></span>
               <span
                 className={

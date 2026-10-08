@@ -704,7 +704,7 @@ export default function SellProduct() {
               onChange={() => {}}
             />
 
-            <div className="grid grid-cols-3 gap-2 md:col-span-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:col-span-2">
               <Button
                 onClick={() => setPaymentStatus("cash")}
                 className="col-span-1 h-11"

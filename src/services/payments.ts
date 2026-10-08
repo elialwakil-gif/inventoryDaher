@@ -1,5 +1,22 @@
 import apiClient from "@/lib/axios";
 
+export interface GoodsPaymentItem {
+  productId: string;
+  name: string;
+  code: string;
+  warehouse: string;
+  unit?: string;
+  quantity: number;
+  settlementPrice: number;
+  settlementPriceUSD: number;
+  costPriceUSD?: number;
+  costUSD: number;
+  lineTotalUSD: number;
+  lineTotalOriginal: number;
+  quantityBefore: number;
+  quantityAfter: number;
+}
+
 export interface Payment {
   id?: string;
   type: string,
@@ -18,6 +35,25 @@ export interface Payment {
   amountUSD?: number,
   amountSYP?: number,
   amountOriginal?: number,
+  sellId?: string,
+  purchaseId?: string,
+  settlementMethod?: "cash" | "goods",
+  goodsDirection?: "receive" | "deliver",
+  goodsItems?: GoodsPaymentItem[],
+  warehouse?: string,
+  partyAccountId?: string,
+  inventoryAccountId?: string,
+  differenceAccountId?: string,
+  balanceUSDChange?: number,
+  balanceSYPChange?: number,
+  goodsCostUSD?: number,
+  goodsDifferenceUSD?: number,
+  reversalOf?: string,
+  reversedBy?: string,
+  status?: "posted" | "reversed",
+  actorId?: string,
+  actorName?: string,
+  driverMovementId?: string,
   date?: string,
   note: string
 }

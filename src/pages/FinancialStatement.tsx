@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/select";
 import AddBalanceForm from "@/components/FinancialStatement/AddBalanceForm";
 import TakeBalanceForm from "@/components/FinancialStatement/TakeBalanceForm";
+import GoodsSettlementActions from "@/components/Payments/GoodsSettlementActions";
+import { goodsPaymentDetails, goodsPaymentLabel } from "@/lib/goodsSettlements";
 import getAllCustomer from "@/services/customer";
 import getAllPayments, { Payment } from "@/services/payments";
 import getAllPurchases from "@/services/purchases";
@@ -46,6 +48,7 @@ interface PurchaseRecord {
   code?: string;
   totalPrice?: number | string;
   totalUSD?: number | string;
+  totalSYP?: number | string;
   totalOriginal?: number | string;
   amount_base?: number | string;
   paymentStatus?: string;
@@ -64,6 +67,7 @@ interface SellRecord {
   customerId?: string;
   totalPrice?: number | string;
   totalUSD?: number | string;
+  totalSYP?: number | string;
   totalOriginal?: number | string;
   amount_base?: number | string;
   paymentStatus?: string;
@@ -85,6 +89,8 @@ interface ReturnRecord {
   code?: string;
   productCode?: string;
   referenceId?: string;
+  invoiceNumber?: string | number;
+  amountSYP?: number | string;
   sellId?: string | number;
   purchaseId?: string | number;
   returnValue?: number | string;
@@ -105,7 +111,7 @@ interface PartyRecord {
 
 interface FinancialOperation {
   id: string;
-  operationType: "purchase" | "sell" | "payment" | "return";
+  operationType: "purchase" | "sell" | "payment" | "return" | "goods";
   operationLabel: string;
   subType: string;
   reference: string;
@@ -117,7 +123,7 @@ interface FinancialOperation {
   amountDisplay: string;
   originalAmount: number;
   currency: string;
-  effect: "داخل" | "خارج" | "ذمم" | "-";
+  effect: "داخل" | "خارج" | "ذمم" | "-" | "استلام بضاعة" | "تسليم بضاعة";
   date: string;
   status: string;
   note: string;
@@ -305,20 +311,21 @@ export default function FinancialStatement() {
   );
 
   const operations = useMemo<FinancialOperation[]>(() => {
-    const payments = (data?.payments || []).map((payment) => {
+    const payments = (data?.payments || []).map<FinancialOperation>((payment) => {
+      const isGoods = payment.settlementMethod === "goods";
       const currency = normalizeCurrency(
         payment.paymentCurrency || payment.currency,
       );
-      const amount = Math.abs(toNumber(payment.amountUSD ?? payment.amount));
-      const amountSYP = Math.abs(toNumber(payment.amountSYP));
+      const amount = isGoods ? toNumber(payment.balanceUSDChange ?? payment.amountUSD ?? payment.amount) : Math.abs(toNumber(payment.amountUSD ?? payment.amount));
+      const amountSYP = isGoods ? toNumber(payment.balanceSYPChange ?? payment.amountSYP) : Math.abs(toNumber(payment.amountSYP));
 
       return {
         id: payment.id || `payment-${payment.date || payment.amount}`,
-        operationType: "payment" as const,
-        operationLabel: "دفعة",
-        subType: getPaymentSubTypeLabel(payment.type),
+        operationType: isGoods ? "goods" as const : "payment" as const,
+        operationLabel: isGoods ? "تسوية بالبضاعة" : "دفعة",
+        subType: isGoods ? goodsPaymentLabel(payment) : getPaymentSubTypeLabel(payment.type),
         reference: payment.id || "-",
-        description: payment.note || "حركة مالية",
+        description: isGoods ? goodsPaymentDetails(payment) : payment.note || "حركة مالية",
         partyName: getPartyName({
           customerId: payment.customerId,
           supplierId: payment.supplierId,
@@ -329,30 +336,29 @@ export default function FinancialStatement() {
         amountUSD: amount,
         amountSYP,
         amountDisplay: "",
-        originalAmount: Math.abs(
-          toNumber(payment.amountOriginal ?? payment.amount_base ?? payment.amount),
-        ),
+        originalAmount: isGoods ? toNumber(payment.amountOriginal ?? payment.amount_base ?? payment.amount) : Math.abs(toNumber(payment.amountOriginal ?? payment.amount_base ?? payment.amount)),
         currency,
         effect:
-          payment.type === "income"
+          isGoods ? payment.goodsDirection === "receive" ? "استلام بضاعة" : "تسليم بضاعة" : payment.type === "income"
             ? "داخل"
             : payment.type === "expense"
               ? "خارج"
               : "-",
         date: payment.date || "",
-        status: "-",
+        status: isGoods ? payment.status === "reversed" ? "ملغاة بسند عكسي" : payment.reversalOf ? "سند عكس" : "مسجلة" : "-",
         note: payment.note || "-",
         sortTime: parseFinancialDate(payment.date),
       };
     });
 
-    const purchases = (data?.purchases || []).map((purchase) => {
+    const purchases = (data?.purchases || []).map<FinancialOperation>((purchase) => {
       const currency = normalizeCurrency(
         purchase.paymentCurrency || purchase.currency,
       );
       const amount = toNumber(purchase.totalUSD ?? purchase.totalPrice);
       const amountSYP = toNumber(purchase.totalSYP);
-      const status = getStatusLabel(purchase.paymentStatus);
+      const hasGoodsPayment = (data?.payments || []).some((payment) => payment.purchaseId === purchase.id && payment.settlementMethod === "goods" && payment.status !== "reversed" && !payment.reversalOf);
+      const status = hasGoodsPayment && purchase.paymentStatus === "cash" ? "مسددة (تتضمن بضاعة)" : getStatusLabel(purchase.paymentStatus);
 
       return {
         id: purchase.id || `purchase-${purchase.date || purchase.code}`,
@@ -374,7 +380,7 @@ export default function FinancialStatement() {
           purchase.totalOriginal ?? purchase.amount_base ?? purchase.totalPrice,
         ),
         currency,
-        effect: purchase.paymentStatus === "cash" ? "خارج" : "ذمم",
+        effect: purchase.paymentStatus === "cash" && !hasGoodsPayment ? "خارج" : "ذمم",
         date: purchase.date || "",
         status,
         note:
@@ -385,11 +391,12 @@ export default function FinancialStatement() {
       };
     });
 
-    const sells = (data?.sells || []).map((sell) => {
+    const sells = (data?.sells || []).map<FinancialOperation>((sell) => {
       const currency = normalizeCurrency(sell.paymentCurrency || sell.currency);
       const amount = toNumber(sell.totalUSD ?? sell.totalPrice);
       const amountSYP = toNumber(sell.totalSYP);
-      const status = getStatusLabel(sell.paymentStatus);
+      const hasGoodsPayment = (data?.payments || []).some((payment) => payment.sellId === sell.id && payment.settlementMethod === "goods" && payment.status !== "reversed" && !payment.reversalOf);
+      const status = hasGoodsPayment && sell.paymentStatus === "cash" ? "مسددة (تتضمن بضاعة)" : getStatusLabel(sell.paymentStatus);
 
       return {
         id: sell.id || `sell-${sell.date}`,
@@ -417,7 +424,7 @@ export default function FinancialStatement() {
           sell.totalOriginal ?? sell.amount_base ?? sell.totalPrice,
         ),
         currency,
-        effect: sell.paymentStatus === "cash" ? "داخل" : "ذمم",
+        effect: sell.paymentStatus === "cash" && !hasGoodsPayment ? "داخل" : "ذمم",
         date: sell.date || "",
         status,
         note:
@@ -428,7 +435,7 @@ export default function FinancialStatement() {
       };
     });
 
-    const returns = (data?.returns || []).map((item) => {
+    const returns = (data?.returns || []).map<FinancialOperation>((item) => {
       const supplierReturn = isSupplierReturn(item);
       const date = getReturnDate(item);
       const currency = normalizeCurrency(item.currency);
@@ -461,7 +468,7 @@ export default function FinancialStatement() {
         operationLabel: "مرتجع",
         subType: supplierReturn ? "مرتجع مورد" : "مرتجع عميل",
         reference:
-          item.invoiceNumber ||
+          item.invoiceNumber?.toString() ||
           item.referenceId ||
           item.sellId?.toString() ||
           item.purchaseId?.toString() ||
@@ -624,6 +631,8 @@ export default function FinancialStatement() {
 
   const netCashMovement = cashInTotal - cashOutTotal;
   const netCashMovementSYP = cashInTotalSYP - cashOutTotalSYP;
+  const goodsNetUSD = filteredOperations.filter((operation) => operation.operationType === "goods").reduce((sum, operation) => sum + operation.amount, 0);
+  const goodsNetSYP = filteredOperations.filter((operation) => operation.operationType === "goods").reduce((sum, operation) => sum + operation.amountSYP, 0);
 
   return (
     <DashboardLayout>
@@ -653,21 +662,22 @@ export default function FinancialStatement() {
               icon={RotateCcw}
             />
             <StatsCard
-              title="الداخل"
+              title="الداخل النقدي"
               value={formatDualAmount(cashInTotal, cashInTotalSYP)}
               icon={ArrowUpCircle}
             />
             <StatsCard
-              title="الخارج"
+              title="الخارج النقدي"
               value={formatDualAmount(cashOutTotal, cashOutTotalSYP)}
               icon={ArrowDownCircle}
             />
             <StatsCard
-              title="صافي الحركة"
+              title="صافي الحركة النقدية"
               value={formatDualAmount(netCashMovement, netCashMovementSYP)}
               icon={ReceiptText}
               description={netCashMovement >= 0 ? "فائض حركة" : "عجز حركة"}
             />
+            <StatsCard title="صافي التسويات بالبضاعة" value={formatDualAmount(goodsNetUSD, goodsNetSYP)} icon={ReceiptText} description="استلام موجب وتسليم سالب؛ يشمل السندات العكسية" />
           </div>
         )}
 
@@ -675,15 +685,15 @@ export default function FinancialStatement() {
           <CardHeader className="flex flex-col gap-4">
             <div>
               <h1 className="mb-4 text-2xl font-bold">العمليات المالية</h1>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
                 <AddBalanceForm isOpen={isOpen} setIsOpen={setIsOpen} />
                 <TakeBalanceForm isOpen={isOpenPay} setIsOpen={setIsOpenPay} />
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
               <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="نوع العملية" />
                 </SelectTrigger>
                 <SelectContent>
@@ -691,12 +701,13 @@ export default function FinancialStatement() {
                   <SelectItem value="purchase">شراء</SelectItem>
                   <SelectItem value="sell">بيع</SelectItem>
                   <SelectItem value="payment">دفعات</SelectItem>
+                  <SelectItem value="goods">تسويات بالبضاعة</SelectItem>
                   <SelectItem value="return">مرتجعات</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="العملة" />
                 </SelectTrigger>
                 <SelectContent>
@@ -715,7 +726,7 @@ export default function FinancialStatement() {
                   setDisplayCurrency(value as "dual" | "USD" | "SYP")
                 }
               >
-                <SelectTrigger className="w-44">
+                <SelectTrigger className="w-full sm:w-44">
                   <SelectValue placeholder="طريقة العرض" />
                 </SelectTrigger>
                 <SelectContent>
@@ -729,7 +740,7 @@ export default function FinancialStatement() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-[260px] justify-start text-left font-normal"
+                    className="w-full justify-start text-left font-normal sm:w-[260px]"
                   >
                     <CalendarIcon className="ml-2 h-4 w-4" />
                     {dateRange?.from ? (
@@ -759,6 +770,7 @@ export default function FinancialStatement() {
 
               <Button
                 variant="ghost"
+                className="w-full sm:w-auto"
                 onClick={() => {
                   setDateRange(undefined);
                   setSelectedType("all");
@@ -776,6 +788,10 @@ export default function FinancialStatement() {
               title=""
               columns={operationsColumns}
               data={displayedOperations}
+              renderRowActions={(row) => {
+                const payment = data?.payments.find((item) => item.id === row.id);
+                return payment?.settlementMethod === "goods" ? <GoodsSettlementActions payment={payment} partyName={String(row.partyName || "")} /> : null;
+              }}
               isLoading={isLoading}
               defaultPageSize={10}
               pageSizeOptions={[10, 20, 50]}

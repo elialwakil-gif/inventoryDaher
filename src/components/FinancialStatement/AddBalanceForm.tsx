@@ -59,7 +59,7 @@ export default function AddBalanceForm({
         title="اضافة دفعة للصندوق"
         trigger={
           <Button
-            className={className}
+            className={`w-full sm:w-auto ${className || ""}`}
             onClick={(e) => {
               setIsOpen(true);
               e.stopPropagation();

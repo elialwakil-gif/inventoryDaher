@@ -40,6 +40,8 @@ export interface Sell {
   invoiceNumber?: string;
   sellId?: number | string;
   totalPrice?: number | string;
+  totalUSD?: number | string;
+  totalSYP?: number | string;
   amount_base?: number | string;
   currency?: string;
   exchangeRate?: number | string;

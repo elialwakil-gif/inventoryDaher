@@ -30,6 +30,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, Truck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 
 type SelectedProduct = Product & {
   qty: number;
@@ -167,6 +168,9 @@ export default function DriverSales() {
         queryClient.invalidateQueries({ queryKey: ["vehicles-table"] }),
         queryClient.invalidateQueries({ queryKey: ["products-table"] }),
         queryClient.invalidateQueries({ queryKey: ["sells-table"] }),
+        queryClient.invalidateQueries({ queryKey: ["driver-statements"] }),
+        queryClient.invalidateQueries({ queryKey: ["driver-collection-invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["vehicle-load-products"] }),
       ]);
     },
     onError: (saleError) => toast.error((saleError as Error).message),
@@ -324,6 +328,7 @@ export default function DriverSales() {
   return (
     <DashboardLayout>
       <div className="space-y-4" dir="rtl">
+        <div className="flex justify-end"><Button variant="outline" asChild><Link to="/driver-statements">البيان المالي والتحصيلات والعمولة</Link></Button></div>
         <Card>
           <CardHeader className="p-4 sm:p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -379,6 +384,7 @@ export default function DriverSales() {
                 <Button
                   type="button"
                   variant="outline"
+                  className="w-full sm:w-auto"
                   onClick={() =>
                     queryClient.invalidateQueries({
                       queryKey: ["driver-vehicles"],
@@ -464,7 +470,7 @@ export default function DriverSales() {
                     onChange={() => {}}
                   />
 
-                  <div className="grid grid-cols-3 gap-2 md:col-span-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:col-span-2">
                     {(["cash", "part", "debt"] as const).map((status) => (
                       <Button
                         key={status}

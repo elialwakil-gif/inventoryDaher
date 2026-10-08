@@ -46,8 +46,8 @@ const normalizeAiReport = (
 
   return {
     ...report,
-    entryId: report.entryId ?? envelope.entryId ?? null,
-    updatedAt: report.updatedAt ?? envelope.updatedAt,
+    entryId: typeof report.entryId === "string" ? report.entryId : typeof envelope.entryId === "string" ? envelope.entryId : null,
+    updatedAt: typeof report.updatedAt === "string" ? report.updatedAt : typeof envelope.updatedAt === "string" ? envelope.updatedAt : undefined,
   };
 };
 
@@ -86,4 +86,3 @@ const n8nWebhookUrl = "https://andrehdaher.app.n8n.cloud/webhook-test/refresh-ai
     throw new Error("خطأ أثناء تحديث التقرير");
   }
 }
-

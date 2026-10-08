@@ -338,7 +338,7 @@ export default function AddProductForm({
           error={errors.unit?.message}
         />
 
-        <div className="md:col-span-2 grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:col-span-2">
           {(["cash", "part", "debt"] as const).map((v) => (
             <Button
               key={v}

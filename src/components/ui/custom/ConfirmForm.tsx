@@ -59,7 +59,7 @@ export default function ConfirmForm({
       </AlertDialogTrigger>
 
       <AlertDialogContent
-        className="max-w-[80vw] rounded-xl"
+        className="w-[calc(100vw-2rem)] max-w-md rounded-xl"
       >
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

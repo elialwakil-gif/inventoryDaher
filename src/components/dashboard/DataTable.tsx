@@ -120,6 +120,11 @@ export function DataTable({
     setSortConfig({ key, direction });
   };
 
+  const isColumnVisible = (column: TableColumn) =>
+    !column.hidden && !(column.onlyAdmin && inventoryUser?.role !== "admin");
+
+  const visibleColumns = columns.filter(isColumnVisible);
+
   const renderCellContent = (value: any, key: string) => {
     if (key === "status") {
       const successStatuses = ["completed", "تم التسديد", "نقدي", "مسدد"];
@@ -223,7 +228,112 @@ export function DataTable({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
-        <div className="w-full overflow-x-auto rounded-md border">
+        <div className="space-y-3 md:hidden">
+          {isLoading ? (
+            SKELETON_ROWS.map((_, rowIndex) => (
+              <div
+                key={`mobile-skeleton-${rowIndex}`}
+                className="rounded-md border bg-card p-3"
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <Skeleton className="h-5 w-32 rounded-md" />
+                  {renderRowActions && (
+                    <Skeleton className="h-8 w-16 rounded-md" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {visibleColumns.slice(0, 4).map((column) => (
+                    <div
+                      key={column.key}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <Skeleton className="h-3 w-20 rounded-md" />
+                      <Skeleton className="h-4 w-28 rounded-md" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : paginatedData.length > 0 ? (
+            paginatedData.map((row, index) => {
+              const firstColumn = visibleColumns[0];
+              const detailColumns = visibleColumns.slice(1);
+
+              return (
+                <div
+                  key={`mobile-row-${index}`}
+                  role={onRowClick ? "button" : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  onClick={() => onRowClick?.(row)}
+                  onKeyDown={(event) => {
+                    if (!onRowClick) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onRowClick(row);
+                    }
+                  }}
+                  className={cn(
+                    "rounded-md border bg-card p-3 text-right shadow-sm",
+                    onRowClick && "cursor-pointer active:bg-muted/60",
+                    getRowClassName ? getRowClassName(row) : "",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      {firstColumn ? (
+                        <>
+                          <p className="text-xs text-muted-foreground">
+                            {firstColumn.label}
+                          </p>
+                          <div className="mt-1 break-words text-base font-semibold">
+                            {renderCellContent(
+                              row[firstColumn.key],
+                              firstColumn.key,
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">-</p>
+                      )}
+                    </div>
+                    {renderRowActions && (
+                      <div
+                        className="flex shrink-0 flex-wrap justify-end gap-1"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {renderRowActions(row)}
+                      </div>
+                    )}
+                  </div>
+
+                  {detailColumns.length > 0 && (
+                    <div className="mt-3 grid gap-2 text-sm">
+                      {detailColumns.map((column) => (
+                        <div
+                          key={column.key}
+                          className="grid grid-cols-[minmax(6rem,40%)_1fr] items-start gap-3 border-t pt-2"
+                        >
+                          <span className="text-muted-foreground">
+                            {column.label}
+                          </span>
+                          <span className="min-w-0 break-words text-right">
+                            {renderCellContent(row[column.key], column.key)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
+              No data found.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden w-full overflow-x-auto rounded-md border md:block">
           <Table className="min-w-[720px] text-center">
             <TableHeader>
               <TableRow>

@@ -90,9 +90,9 @@ export default function WarehousesDetails() {
         row={productRow as ProductTableRow}
       />
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="flex items-center gap-2 break-words text-2xl font-bold">
             <Warehouse size={22} />
             {warehouse.name}
           </h1>
@@ -102,7 +102,7 @@ export default function WarehousesDetails() {
         <Button
           variant="outline"
           onClick={() => navigate("/warehouses")}
-          className="gap-2"
+          className="w-full gap-2 sm:w-auto"
         >
           <ArrowLeft size={16} />
           رجوع

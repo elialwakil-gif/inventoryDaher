@@ -1,4 +1,7 @@
 import CustomerPaymentForm from "@/components/Customers/CustomerPaymentForm";
+import GoodsSettlementForm from "@/components/Payments/GoodsSettlementForm";
+import GoodsSettlementActions from "@/components/Payments/GoodsSettlementActions";
+import { goodsPaymentDetails, goodsPaymentLabel } from "@/lib/goodsSettlements";
 import AccountSelect from "@/components/Accounts/AccountSelect";
 import DetailsInputs from "@/components/Customers/DetailsInputs";
 import { DataTable } from "@/components/dashboard/DataTable";
@@ -40,11 +43,6 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numberValue) ? numberValue : 0;
 };
 
-const formatAmount = (value: unknown) =>
-  toNumber(value).toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-  });
-
 const formatDualCurrency = (usd: unknown, syp?: unknown) => {
   const sypAmount = toNumber(syp);
   const usdText = formatCurrencyAmount(toNumber(usd), "USD");
@@ -60,6 +58,7 @@ const getPaymentStatusLabel = (status?: string) => {
 };
 
 const getPaymentMovementLabel = (payment: any) => {
+  if (payment?.settlementMethod === "goods") return goodsPaymentLabel(payment);
   const note = String(payment?.note || "");
 
   if (payment?.sellId && payment?.type === "income") return "تسديد فاتورة";
@@ -179,6 +178,7 @@ export default function CustomerDetails() {
     { label: "الفاتورة", key: "invoiceReference" },
     { label: "المبلغ", key: "amountDisplay" },
     { label: "العملة", key: "currency" },
+    { label: "تفاصيل البضاعة", key: "goodsDetails" },
     { label: "الوصف", key: "note" },
     { label: "التاريخ", key: "date" },
   ];
@@ -229,7 +229,7 @@ export default function CustomerDetails() {
                           ? ` (${formatExchangeRate(payment.exchangeRate)})`
                           : "";
 
-                        return `${formatDualCurrency(payment.amountUSD ?? payment.amount, payment.amountSYP)}${exchangeRateText} - ${
+                        return `${payment.settlementMethod === "goods" ? `${goodsPaymentLabel(payment)}: ` : ""}${formatDualCurrency(payment.amountUSD ?? payment.amount, payment.amountSYP)}${exchangeRateText} - ${
                           payment.date
                             ? new Date(payment.date).toLocaleDateString("en-GB")
                             : ""
@@ -241,9 +241,9 @@ export default function CustomerDetails() {
 
               return {
                 ...purchase,
-                status:
-                  purchase.paymentStatusLabel ||
-                  getPaymentStatusLabel(purchase.paymentStatus),
+                status: purchase.paymentStatus === "cash" && invoicePayments.some((payment) => payment.settlementMethod === "goods" && payment.status !== "reversed" && !payment.reversalOf)
+                  ? "مسددة (تتضمن بضاعة)"
+                  : purchase.paymentStatusLabel || getPaymentStatusLabel(purchase.paymentStatus),
                 totalPriceDisplay: formatDualCurrency(totalPrice, totalSYP),
                 paidAmount,
                 paidAmountDisplay: formatDualCurrency(paidAmount, paidSYP),
@@ -280,6 +280,7 @@ export default function CustomerDetails() {
             payment.amountSYP,
           ),
           currency: payment.currency || "-",
+          goodsDetails: payment.settlementMethod === "goods" ? goodsPaymentDetails(payment) : "-",
         }))
         .sort((a, b) => parseDate(b.date) - parseDate(a.date)),
     [data],
@@ -312,10 +313,10 @@ export default function CustomerDetails() {
         fromCustomer: 0,
       })) ?? []),
     ...(data?.data?.payments ?? []).map((p) => ({
-      details: p?.note,
+      details: p?.settlementMethod === "goods" ? `${goodsPaymentLabel(p)} · ${goodsPaymentDetails(p)} · ${p.note || ""}` : p?.note,
       date: p?.date,
-      toTheCustoemr: 0,
-      fromCustomer: p?.amount,
+      toTheCustoemr: p?.settlementMethod === "goods" ? Math.max(-toNumber(p.balanceUSDChange ?? p.amountUSD ?? p.amount), 0) : 0,
+      fromCustomer: p?.settlementMethod === "goods" ? Math.max(toNumber(p.balanceUSDChange ?? p.amountUSD ?? p.amount), 0) : p?.amount,
     })),
   ];
 
@@ -428,8 +429,8 @@ export default function CustomerDetails() {
   return (
     <DashboardLayout>
       <div className="space-y-6" dir="rtl">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">بيانات الزبون</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-bold sm:text-3xl">بيانات الزبون</h1>
           <Button onClick={() => navigate(-1)} variant="outline">
             <ArrowLeft className="ml-2 w-4 h-4" /> رجوع
           </Button>
@@ -443,7 +444,7 @@ export default function CustomerDetails() {
           <CardContent className="grid grid-cols-1 gap-4">
             <DetailsInputs customer={customer} setCustomer={setCustomer} />
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
               <Button>
                 <PDFDownloadLink
                   document={
@@ -474,6 +475,7 @@ export default function CustomerDetails() {
                 setIsOpen={setIsOpen}
                 customerData={customer}
               />
+              <GoodsSettlementForm partyType="customer" party={{ ...customer, id: getCurrentCustomerId() }} />
               {/* إضافة دفعة */}
               <PopupForm
                 title="دفع للزبون"
@@ -605,11 +607,12 @@ export default function CustomerDetails() {
                 title="الدفعات"
                 columns={paymentsColumns}
                 data={customerPayments}
+                renderRowActions={(row) => <GoodsSettlementActions payment={row as any} partyName={customer.name || ""} />}
               />
 
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
                 <div className="rounded-md border p-3">
-                  <p className="text-sm text-muted-foreground">فواتير نقدية</p>
+                  <p className="text-sm text-muted-foreground">فواتير مسددة</p>
                   <p className="text-xl font-bold">{salesSummary.cash}</p>
                 </div>
                 <div className="rounded-md border p-3">
@@ -638,6 +641,7 @@ export default function CustomerDetails() {
                 data={customerSales}
                 renderRowActions={(row) => (
                   <div className="flex gap-2">
+                    <GoodsSettlementForm partyType="customer" party={{ ...customer, id: getCurrentCustomerId() }} invoice={row as any} />
                     <Button
                       variant="outline"
                       onClick={() => {

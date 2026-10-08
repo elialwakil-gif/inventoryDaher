@@ -1,11 +1,11 @@
-import React, { useState  } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DataTable } from '@/components/dashboard/DataTable'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import PopupForm from '@/components/ui/custom/PopupForm'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { Plus, Edit, Trash2 , Info, Database, RefreshCw } from 'lucide-react'
+import { Plus, Edit, Trash2 , Info } from 'lucide-react'
 import AddAccountForm from '@/components/Accounts/AddAccountForm'
 import UpdateAccountForm from '@/components/Accounts/UpdateAccountForm'
 import { useGetAccount, useDeleteAccount } from '@/hooks/useAccount'
@@ -40,7 +40,7 @@ export default function ChartAccount() {
     const formatMigrationSummary = (summary: CurrencyMigrationSummary) =>
         `بيع ${summary.sells}، شراء ${summary.purchases}، دفعات ${summary.payments}، حسابات ${summary.accounts}، عملاء ${summary.customers}، موردون ${summary.suppliers}`;
 
-    const previewMigration = useMutation({
+    useMutation({
         mutationFn: previewCurrencyMigration,
         onSuccess: (summary) => {
             toast({
@@ -57,7 +57,7 @@ export default function ChartAccount() {
         },
     });
 
-    const executeMigration = useMutation({
+    useMutation({
         mutationFn: runCurrencyMigration,
         onSuccess: (summary) => {
             queryClient.invalidateQueries({ queryKey: ['financial-operations'] });

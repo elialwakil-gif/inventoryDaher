@@ -13,7 +13,7 @@ export default function Customer() {
     const navigate = useNavigate()
     const [addIsOpen, setAddIsOpen] = useState(false);
 
-    const { data: customer, isLoading: customerLoading } = useQuery({
+    const { data: customer } = useQuery({
         queryKey: ["customers-table"],
         queryFn: getAllCustomer,
     })

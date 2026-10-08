@@ -13,20 +13,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import getAllProducts from "@/services/products";
+import { availableLoadQuantity, filterVehicleLoadProducts } from "@/lib/vehicleProductSearch";
 import type { Product } from "@/services/transaction";
 import { getAllUsers } from "@/services/users";
 import {
   createVehicle,
   getAllVehicles,
+  getVehicleLoadProducts,
   loadVehicle,
   updateVehicle,
-  VehicleSummary,
 } from "@/services/vehicles";
 import { getAllWarehouses } from "@/services/warehouse";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PackagePlus, Pencil, Plus, Truck, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 type LoadProduct = Product & { loadQty: number; loadSellPrice: number };
@@ -45,12 +45,7 @@ const formatMoney = (value: unknown) =>
     minimumFractionDigits: 0,
   });
 
-const getAvailableQuantity = (product: Product) =>
-  Math.max(toNumber(product.quantity) - toNumber(product.reservedQuantity), 0);
-
-const normalizeWarehouseName = (value: unknown) => String(value || "").trim();
-const matchesSearch = (value: unknown, search: string) =>
-  String(value || "").toLowerCase().includes(search);
+const getAvailableQuantity = availableLoadQuantity;
 
 export default function Vehicles() {
   const queryClient = useQueryClient();
@@ -77,6 +72,7 @@ export default function Vehicles() {
   const [loadSearch, setLoadSearch] = useState("");
   const [loadNote, setLoadNote] = useState("");
   const [loadProducts, setLoadProducts] = useState<LoadProduct[]>([]);
+  const [loadRequestId, setLoadRequestId] = useState(() => crypto.randomUUID());
 
   const { data: vehicleSummaries = [], isLoading } = useQuery({
     queryKey: ["vehicles-table"],
@@ -88,14 +84,16 @@ export default function Vehicles() {
     queryFn: getAllUsers,
   });
 
-  const { data: warehouses = [] } = useQuery({
+  const { data: warehouses = [], isFetching: warehousesLoading, isError: warehousesError, refetch: reloadWarehouses } = useQuery({
     queryKey: ["warehouses-table"],
     queryFn: getAllWarehouses,
   });
 
-  const { data: products = [] } = useQuery<Product[]>({
-    queryKey: ["products-table"],
-    queryFn: getAllProducts,
+  const { data: products = [], isFetching: productsLoading, isError: productsError, refetch: reloadProducts } = useQuery<Product[]>({
+    queryKey: ["vehicle-load-products"],
+    queryFn: getVehicleLoadProducts,
+    enabled: isLoadOpen,
+    staleTime: 0,
   });
 
   const selectedVehicle =
@@ -118,24 +116,18 @@ export default function Vehicles() {
     [selectedVehicle?.vehicle.name, warehouses],
   );
 
-  const filteredLoadProducts = useMemo(() => {
-    const search = loadSearch.trim().toLowerCase();
-    if (!sourceWarehouse || !search) return [];
+  const selectedSourceWarehouse = standardWarehouses.find((warehouse) => warehouse.id === sourceWarehouse);
+  const filteredLoadProducts = useMemo(
+    () => filterVehicleLoadProducts(products, selectedSourceWarehouse, loadSearch),
+    [loadSearch, products, selectedSourceWarehouse],
+  );
 
-    return products
-      .filter(
-        (product) =>
-          normalizeWarehouseName(product.warehouse) ===
-          normalizeWarehouseName(sourceWarehouse),
-      )
-      .filter((product) => getAvailableQuantity(product) > 0)
-      .filter(
-        (product) =>
-          matchesSearch(product.name, search) ||
-          matchesSearch(product.code, search),
-      )
-      .slice(0, 12);
-  }, [loadSearch, products, sourceWarehouse]);
+  useEffect(() => {
+    setLoadProducts((current) => current.flatMap((item) => {
+      const fresh = products.find((product) => product.id === item.id);
+      return fresh ? [{ ...fresh, loadQty: item.loadQty, loadSellPrice: item.loadSellPrice }] : [];
+    }));
+  }, [products]);
 
   const resetCreateForm = () => {
     setVehicleName("");
@@ -152,6 +144,7 @@ export default function Vehicles() {
     setLoadSearch("");
     setLoadNote("");
     setLoadProducts([]);
+    setLoadRequestId(crypto.randomUUID());
   };
 
   const invalidateVehicleData = async () => {
@@ -160,6 +153,8 @@ export default function Vehicles() {
       queryClient.invalidateQueries({ queryKey: ["products-table"] }),
       queryClient.invalidateQueries({ queryKey: ["warehouses-table"] }),
       queryClient.invalidateQueries({ queryKey: ["users-table"] }),
+      queryClient.invalidateQueries({ queryKey: ["vehicle-load-products"] }),
+      queryClient.invalidateQueries({ queryKey: ["driver-statements"] }),
     ]);
   };
 
@@ -282,7 +277,7 @@ export default function Vehicles() {
         ...current,
         {
           ...product,
-          loadQty: 1,
+          loadQty: Math.min(1, getAvailableQuantity(product)),
           loadSellPrice: toNumber(product.sellPrice),
         },
       ];
@@ -309,8 +304,13 @@ export default function Vehicles() {
       return;
     }
 
-    if (!sourceWarehouse) {
+    if (!selectedSourceWarehouse) {
       toast.error("اختر المستودع المصدر");
+      return;
+    }
+
+    if (productsLoading || productsError) {
+      toast.error("انتظر اكتمال تحديث منتجات التحميل");
       return;
     }
 
@@ -338,7 +338,9 @@ export default function Vehicles() {
     loadVehicleMutation.mutate({
       vehicleId: vehicle.id,
       payload: {
-        sourceWarehouse,
+        requestId: loadRequestId,
+        sourceWarehouse: selectedSourceWarehouse.name,
+        sourceWarehouseId: selectedSourceWarehouse.id,
         note: loadNote.trim() || undefined,
         items: loadProducts.map((product) => ({
           productId: product.id,
@@ -578,7 +580,9 @@ export default function Vehicles() {
                 title="تحميل سيارة"
                 isOpen={isLoadOpen}
                 setIsOpen={(value) => {
+                  if (value && !selectedVehicle) return;
                   setIsLoadOpen(value);
+                  if (value) reloadWarehouses();
                   if (!value) resetLoadForm();
                 }}
                 trigger={
@@ -600,30 +604,43 @@ export default function Vehicles() {
                       {selectedVehicle?.vehicle.name || "اختر سيارة"}
                     </div>
                   </div>
-                  <Select value={sourceWarehouse} onValueChange={setSourceWarehouse}>
+                  <Select value={sourceWarehouse} onValueChange={(value) => {
+                    setSourceWarehouse(value);
+                    setLoadProducts([]);
+                    setLoadSearch("");
+                  }} disabled={warehousesLoading || warehousesError}>
                     <SelectTrigger>
                       <SelectValue placeholder="المستودع المصدر" />
                     </SelectTrigger>
                     <SelectContent>
                       {standardWarehouses.map((warehouse) => (
-                        <SelectItem key={warehouse.id} value={warehouse.name}>
+                        <SelectItem key={warehouse.id} value={warehouse.id}>
                           {warehouse.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {warehousesLoading && <p role="status" className="text-sm text-muted-foreground">جارٍ تحديث قائمة المستودعات…</p>}
+                  {warehousesError && <div role="alert" className="space-y-2 text-sm text-destructive"><p>تعذر جلب المستودعات.</p><Button type="button" variant="outline" onClick={() => reloadWarehouses()}>إعادة المحاولة</Button></div>}
+                  {!warehousesLoading && !warehousesError && !standardWarehouses.length && <p className="text-sm text-muted-foreground">لا توجد مستودعات مصدر متاحة للتحميل.</p>}
                   <Input
                     value={loadSearch}
                     onChange={(event) => setLoadSearch(event.target.value)}
-                    placeholder="ابحث عن منتج للتحميل"
+                    disabled={!sourceWarehouse || productsLoading || productsError}
+                    placeholder="ابحث باسم المنتج أو الكود"
                   />
-                  {filteredLoadProducts.length > 0 && (
+                  {!sourceWarehouse && <p className="text-sm text-muted-foreground">اختر المستودع المصدر لعرض منتجاته والبحث فيها.</p>}
+                  {productsLoading && <p role="status" className="text-sm text-muted-foreground">جارٍ تحديث المنتجات والكميات المتاحة…</p>}
+                  {productsError && <div role="alert" className="space-y-2 text-sm text-destructive"><p>تعذر جلب منتجات التحميل.</p><Button type="button" variant="outline" onClick={() => reloadProducts()}>إعادة المحاولة</Button></div>}
+                  {sourceWarehouse && !productsLoading && !productsError && !filteredLoadProducts.length && <p role="status" className="text-sm text-muted-foreground">{loadSearch.trim() ? "لا توجد منتجات متاحة تطابق البحث في هذا المستودع." : "لا توجد كميات متاحة للتحميل في هذا المستودع."}</p>}
+                  {!productsLoading && !productsError && filteredLoadProducts.length > 0 && (
                     <div className="max-h-52 overflow-y-auto rounded-md border">
+                      <p className="bg-muted/40 p-2 text-xs text-muted-foreground">{filteredLoadProducts.length} منتج متاح</p>
                       {filteredLoadProducts.map((product) => (
                         <button
                           key={product.id}
                           type="button"
-                          className="flex w-full items-center justify-between gap-3 border-b p-3 text-right text-sm last:border-b-0 hover:bg-muted"
+                          className="flex w-full flex-col gap-1 border-b p-3 text-right text-sm last:border-b-0 hover:bg-muted sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                           onClick={() => addLoadProduct(product)}
                         >
                           <span>
@@ -641,8 +658,8 @@ export default function Vehicles() {
                       key={product.id}
                       className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_110px_110px_40px]"
                     >
-                      <div>
-                        <p className="font-medium">{product.name}</p>
+                      <div className="min-w-0">
+                        <p className="break-words font-medium">{product.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {product.code} | المتاح:{" "}
                           {formatNumber(getAvailableQuantity(product))}
@@ -693,7 +710,7 @@ export default function Vehicles() {
                     type="button"
                     className="w-full"
                     loading={loadVehicleMutation.isPending}
-                    disabled={loadVehicleMutation.isPending}
+                    disabled={loadVehicleMutation.isPending || productsLoading || productsError || !selectedSourceWarehouse || !loadProducts.length}
                     onClick={submitLoadVehicle}
                   >
                     تأكيد التحميل
@@ -711,7 +728,7 @@ export default function Vehicles() {
                 <CardTitle className="text-lg">ملخص {selectedVehicle.vehicle.name}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3 text-sm">
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-2">
                   <span>السائق</span>
                   <strong>
                     {selectedVehicle.vehicle.driverName ||
@@ -719,15 +736,15 @@ export default function Vehicles() {
                       "غير محدد"}
                   </strong>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-2">
                   <span>الكمية الموجودة</span>
                   <strong>{formatNumber(selectedVehicle.totals.totalQuantity)}</strong>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-2">
                   <span>قيمة المخزون بيعاً</span>
                   <strong>{formatMoney(selectedVehicle.totals.stockSellValue)}</strong>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-2">
                   <span>مبيعات اليوم</span>
                   <strong>{formatMoney(selectedVehicle.totals.salesTotal)}</strong>
                 </div>
