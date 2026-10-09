@@ -1,4 +1,5 @@
-import apiClient from "@/lib/axios";
+import apiClient, { getBaseURL } from "@/lib/axios";
+import { normalizeLoginResponse } from "@/lib/authSession";
 
 const getLoginErrorMessage = (error: any) => {
   const responseData = error?.response?.data;
@@ -19,12 +20,13 @@ export default async function userLogin({username, password}) {
 
     try {
 
+      const loginServerURL = getBaseURL();
       const response = await apiClient.post("/api/auth/login", {
         username: username,
         password: password,
       });
 
-      return response.data
+      return normalizeLoginResponse(response.data, response.config?.baseURL || loginServerURL);
       
     } catch (err) {
       console.error("خطأ في تسجيل الدخول:", err);

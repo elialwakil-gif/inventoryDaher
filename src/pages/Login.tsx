@@ -8,6 +8,7 @@ import userLogin from "@/services/auth";
 import { toast } from "sonner";
 import { User, Lock } from "lucide-react";
 import { getFirstAccessibleNavigationPath } from "@/config/permissions";
+import { saveAuthenticatedSession } from "@/lib/authSession";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -30,14 +31,7 @@ export default function Login() {
       const res = await userLogin({ username, password });
 
       if (res?.user) {
-        localStorage.setItem("InventoryUser", JSON.stringify(res.user));
-        const token = res?.token || res?.accessToken || res?.user?.token;
-
-        if (token) {
-          localStorage.setItem("auth_token", token);
-        } else {
-          localStorage.removeItem("auth_token");
-        }
+        saveAuthenticatedSession(res);
 
         navigate(getFirstAccessibleNavigationPath(res.user), { replace: true });
         toast.success("تم تسجيل الدخول بنجاح");

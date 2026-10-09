@@ -1,4 +1,5 @@
 import { Navigate } from "react-router-dom";
+import { getAuthenticatedUser } from "@/lib/authSession";
 import {
   AppPermission,
   hasExplicitPermissions,
@@ -16,21 +17,8 @@ export function PrivateRoute({
   allowedRoles = [],
   permission,
 }: PrivateRouteProps) {
-  const userStr = localStorage.getItem("InventoryUser");
-
-  if (!userStr) {
-    return <Navigate to="/login" replace />;
-  }
-
-  let user: any = null;
-
-  try {
-    user = JSON.parse(userStr);
-  } catch {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (!user || !user.role) {
+  const user = getAuthenticatedUser();
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 

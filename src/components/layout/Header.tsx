@@ -11,6 +11,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { clearAuthSession } from "@/lib/authSession";
+import { disconnectInvoiceDraftSocket } from "@/lib/invoiceDraftSocket";
 
 export interface inventoryUser {
   id: string,
@@ -92,8 +94,8 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => {
-                    localStorage.removeItem("InventoryUser");
-                    localStorage.removeItem("auth_token");
+                    clearAuthSession();
+                    disconnectInvoiceDraftSocket();
                     navigate("/login");
                   }}
                 >
