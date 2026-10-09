@@ -2,6 +2,11 @@ import AccountSelect from "@/components/Accounts/AccountSelect";
 import GoodsSettlementForm from "@/components/Payments/GoodsSettlementForm";
 import GoodsSettlementActions from "@/components/Payments/GoodsSettlementActions";
 import { goodsPaymentDetails, goodsPaymentLabel } from "@/lib/goodsSettlements";
+import {
+  cashPaymentAmountUSD,
+  cashPaymentErrorMessage,
+  invalidateCashPaymentQueries,
+} from "@/lib/cashPayment";
 import DetailsInputs from "@/components/Customers/DetailsInputs";
 import { DataTable } from "@/components/dashboard/DataTable";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -20,6 +25,8 @@ import {
 import {
   formatExchangeRate,
   formatMoney as formatCurrencyAmount,
+  normalizeCurrency,
+  roundMoney,
   shouldShowExchangeRate,
 } from "@/lib/money";
 import { getSupplierById } from "@/services/supplier";
@@ -82,7 +89,7 @@ export default function SupplierDetails() {
   const [isDebt, setIsDebt] = useState<"cash" | "part" | "debt">("cash");
   const [partValue, setPartValue] = useState(0);
   const [reason, setReason] = useState("");
-  const [currency, setCurrency] = useState("");
+  const [currency, setCurrency] = useState("USD");
   const [exchangeRate, setExchangeRate] = useState(1);
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   const [paymentAccountId, setPaymentAccountId] = useState("");
@@ -118,7 +125,7 @@ export default function SupplierDetails() {
   const resetPaymentForm = () => {
     setAmount("");
     setNote("");
-    setCurrency("");
+    setCurrency("USD");
     setExchangeRate(1);
     setInvoicePaymentOpenId(null);
     setInvoicePaymentAmount(0);
@@ -161,17 +168,10 @@ export default function SupplierDetails() {
       resetPaymentForm();
       setIsOpen(false);
       setIsOpenTo(false);
-      queryClient.invalidateQueries({
-        queryKey: ["supplier-details"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["products-table"],
-      });
-      queryClient.invalidateQueries({ queryKey: ["payments-table"] });
+      void invalidateCashPaymentQueries(queryClient);
     },
     onError: (error) => {
-      console.error(error);
-      toast.error("حدث خطأ أثناء إضافة الدفعة");
+      toast.error(cashPaymentErrorMessage(error));
     },
   });
 
@@ -353,62 +353,62 @@ export default function SupplierDetails() {
   const getCurrentSupplierId = () =>
     String(supplier?.id || supplierIdValue || "");
 
-  const getPaymentAmountInBaseCurrency = (
-    rawAmount: number,
-    selectedCurrency: string,
-    selectedExchangeRate: number,
-  ) =>
-    selectedCurrency === "USD"
-      ? rawAmount
-      : Number((rawAmount / selectedExchangeRate).toFixed(3));
+  const setGeneralSupplierPaymentOpen = (
+    direction: "in" | "out",
+    nextOpen: boolean,
+  ) => {
+    if (nextOpen) {
+      if (paySupplierDebtMutation.isPending || !data?.data) return;
+      resetPaymentForm();
+      setPaymentAccountId(supplier.defaultPaymentAccountId || "");
+      setPayableAccountId(supplier.defaultPayableAccountId || "");
+      setIsOpen(direction === "in");
+      setIsOpenTo(direction === "out");
+      return;
+    }
+    if (direction === "in") setIsOpen(false);
+    else setIsOpenTo(false);
+  };
 
   const submitGeneralSupplierPayment = (direction: "in" | "out") => {
+    if (paySupplierDebtMutation.isPending) return;
     const amountNumber = toNumber(amount);
 
     if (!validateSupplierPaymentAccounts()) return;
 
-    if (amountNumber <= 0) {
-      toast.error("قيمة الدفعة يجب أن تكون أكبر من صفر");
-      return;
+    try {
+      const amountInBaseCurrency = cashPaymentAmountUSD(
+        amountNumber,
+        currency,
+        exchangeRate,
+      );
+      const sign = direction === "out" ? -1 : 1;
+
+      paySupplierDebtMutation.mutate({
+        supplierId: getCurrentSupplierId(),
+        amount: sign * amountInBaseCurrency,
+        amountUSD: sign * amountInBaseCurrency,
+        amountSYP: currency === "SYP" ? sign * amountNumber : 0,
+        amountOriginal: amountNumber,
+        note,
+        currency,
+        paymentCurrency: currency as "USD" | "SYP",
+        exchangeRate: currency === "USD" ? 1 : exchangeRate,
+        amount_base: amountNumber,
+        paymentAccountId,
+        payableAccountId,
+      });
+    } catch (error) {
+      toast.error(cashPaymentErrorMessage(error));
     }
-
-    if (!currency) {
-      toast.error("الرجاء اختيار العملة");
-      return;
-    }
-
-    if (currency !== "USD" && toNumber(exchangeRate) <= 0) {
-      toast.error("الرجاء إدخال سعر صرف صحيح");
-      return;
-    }
-
-    const amountInBaseCurrency = getPaymentAmountInBaseCurrency(
-      amountNumber,
-      currency,
-      exchangeRate,
-    );
-    const sign = direction === "out" ? -1 : 1;
-
-    paySupplierDebtMutation.mutate({
-      supplierId: getCurrentSupplierId(),
-      amount: sign * amountInBaseCurrency,
-      amountUSD: sign * amountInBaseCurrency,
-      amountSYP: currency === "SYP" ? sign * amountNumber : 0,
-      amountOriginal: sign * amountNumber,
-      note,
-      currency,
-      paymentCurrency: currency as "USD" | "SYP",
-      exchangeRate: currency === "USD" ? 1 : exchangeRate,
-      amount_base: sign * amountNumber,
-      paymentAccountId,
-      payableAccountId,
-    });
   };
 
   const openInvoicePayment = (purchase: any) => {
-    const nextCurrency = purchase.paymentCurrency || purchase.currency || "USD";
+    const nextCurrency = normalizeCurrency(
+      purchase.paymentCurrency || purchase.currency,
+    );
     const nextExchangeRate =
-      nextCurrency === "USD" ? 1 : toNumber(purchase.exchangeRate) || 1;
+      nextCurrency === "USD" ? 1 : Math.max(toNumber(purchase.exchangeRate), 0);
     const remainingDebt = toNumber(
       purchase.remainingUSD ?? purchase.remainingDebt,
     );
@@ -417,8 +417,7 @@ export default function SupplierDetails() {
     setInvoicePaymentAmount(
       nextCurrency === "USD"
         ? remainingDebt
-        : toNumber(purchase.remainingSYP) ||
-          Number((remainingDebt * nextExchangeRate).toFixed(3)),
+        : roundMoney(remainingDebt * nextExchangeRate),
     );
     setInvoicePaymentNote(
       `تسديد فاتورة شراء ${String(purchase.code || purchase.id).slice(0, 12)}`,
@@ -430,22 +429,13 @@ export default function SupplierDetails() {
   };
 
   const submitInvoicePayment = (purchase: any) => {
+    if (paySupplierDebtMutation.isPending) return;
     const remainingDebt = toNumber(
       purchase.remainingUSD ?? purchase.remainingDebt,
-    );
-    const amountInBaseCurrency = getPaymentAmountInBaseCurrency(
-      invoicePaymentAmount,
-      invoicePaymentCurrency,
-      invoicePaymentExchangeRate,
     );
 
     if (remainingDebt <= 0) {
       toast.error("هذه الفاتورة مسددة بالكامل");
-      return;
-    }
-
-    if (amountInBaseCurrency <= 0 || amountInBaseCurrency > remainingDebt) {
-      toast.error("قيمة الدفعة يجب أن تكون أكبر من صفر ولا تتجاوز المتبقي");
       return;
     }
 
@@ -454,46 +444,49 @@ export default function SupplierDetails() {
       return;
     }
 
-    if (
-      invoicePaymentCurrency !== "USD" &&
-      invoicePaymentExchangeRate <= 0
-    ) {
-      toast.error("الرجاء إدخال سعر صرف صحيح");
-      return;
-    }
+    try {
+      const amountInBaseCurrency = cashPaymentAmountUSD(
+        invoicePaymentAmount,
+        invoicePaymentCurrency,
+        invoicePaymentExchangeRate,
+      );
+      if (amountInBaseCurrency > roundMoney(remainingDebt)) {
+        toast.error("قيمة الدفعة يجب ألا تتجاوز المتبقي من الفاتورة");
+        return;
+      }
 
-    paySupplierDebtMutation.mutate({
-      supplierId: getCurrentSupplierId(),
-      purchaseId: purchase.id,
-      amount: -amountInBaseCurrency,
-      amountUSD: -amountInBaseCurrency,
-      amountSYP:
-        invoicePaymentCurrency === "SYP" ? -invoicePaymentAmount : 0,
-      amountOriginal: -invoicePaymentAmount,
-      note:
-        invoicePaymentNote ||
-        `تسديد فاتورة شراء ${String(purchase.code || purchase.id).slice(
-          0,
-          12,
-        )}`,
-      currency: invoicePaymentCurrency,
-      paymentCurrency: invoicePaymentCurrency as "USD" | "SYP",
-      exchangeRate: invoicePaymentCurrency === "USD" ? 1 : invoicePaymentExchangeRate,
-      amount_base: -invoicePaymentAmount,
-      paymentAccountId,
-      payableAccountId,
-    });
+      paySupplierDebtMutation.mutate({
+        supplierId: getCurrentSupplierId(),
+        purchaseId: purchase.id,
+        amount: -amountInBaseCurrency,
+        amountUSD: -amountInBaseCurrency,
+        amountSYP: invoicePaymentCurrency === "SYP" ? -invoicePaymentAmount : 0,
+        amountOriginal: invoicePaymentAmount,
+        note:
+          invoicePaymentNote ||
+          `تسديد فاتورة شراء ${String(purchase.code || purchase.id).slice(
+            0,
+            12,
+          )}`,
+        currency: invoicePaymentCurrency,
+        paymentCurrency: invoicePaymentCurrency as "USD" | "SYP",
+        exchangeRate:
+          invoicePaymentCurrency === "USD" ? 1 : invoicePaymentExchangeRate,
+        amount_base: invoicePaymentAmount,
+        paymentAccountId,
+        payableAccountId,
+      });
+    } catch (error) {
+      toast.error(cashPaymentErrorMessage(error));
+    }
   };
 
   const getInvoicePaymentMaxAmount = (purchase: any) =>
     invoicePaymentCurrency === "USD"
       ? toNumber(purchase.remainingUSD ?? purchase.remainingDebt)
-      : Number(
-          (
-            toNumber(purchase.remainingSYP) ||
-            toNumber(purchase.remainingUSD ?? purchase.remainingDebt) *
-              toNumber(invoicePaymentExchangeRate)
-          ).toFixed(3),
+      : roundMoney(
+          toNumber(purchase.remainingUSD ?? purchase.remainingDebt) *
+            Math.max(toNumber(invoicePaymentExchangeRate), 0),
         );
 
   const handleReturn = async (e: React.FormEvent, row: any) => {
@@ -591,10 +584,8 @@ export default function SupplierDetails() {
                 trigger={
                   <Button
                     className="w-full"
-                    onClick={(e) => {
-                      setIsOpen(true);
-                      e.stopPropagation();
-                    }}
+                    type="button"
+                    disabled={paySupplierDebtMutation.isPending || !data?.data}
                     variant="accent"
                     size="sm"
                   >
@@ -602,7 +593,9 @@ export default function SupplierDetails() {
                   </Button>
                 }
                 isOpen={isOpen}
-                setIsOpen={setIsOpen}
+                setIsOpen={(nextOpen) =>
+                  setGeneralSupplierPaymentOpen("in", nextOpen)
+                }
               >
                 <form
                   className="space-y-4 mt-4"
@@ -615,6 +608,9 @@ export default function SupplierDetails() {
                     label="قيمة الدفعة"
                     id="payment-amount-in"
                     type="number"
+                    required
+                    min={0}
+                    step="any"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                   />
@@ -625,7 +621,13 @@ export default function SupplierDetails() {
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                   />
-                  <Select value={currency} onValueChange={setCurrency}>
+                  <Select
+                    value={currency}
+                    onValueChange={(nextCurrency) => {
+                      setCurrency(nextCurrency);
+                      setExchangeRate(nextCurrency === "USD" ? 1 : 0);
+                    }}
+                  >
                     <SelectTrigger className="w-full mt-6">
                       <SelectValue placeholder="العملة المدفوع بها" />
                     </SelectTrigger>
@@ -640,6 +642,10 @@ export default function SupplierDetails() {
                   <FormInput
                     id="exchangeRate-in"
                     label="سعر الصرف"
+                    type="number"
+                    required
+                    min={0}
+                    step="any"
                     value={currency === "USD" ? 1 : exchangeRate}
                     onChange={(e) => setExchangeRate(Number(e.target.value))}
                     disabled={currency === "USD"}
@@ -670,12 +676,20 @@ export default function SupplierDetails() {
               <PopupForm
                 title="دفع للمورد"
                 trigger={
-                  <Button className="w-full" variant="destructive" size="sm">
+                  <Button
+                    className="w-full"
+                    variant="destructive"
+                    size="sm"
+                    type="button"
+                    disabled={paySupplierDebtMutation.isPending || !data?.data}
+                  >
                     دفع للمورد
                   </Button>
                 }
                 isOpen={isOpenTo}
-                setIsOpen={setIsOpenTo}
+                setIsOpen={(nextOpen) =>
+                  setGeneralSupplierPaymentOpen("out", nextOpen)
+                }
               >
                 <form
                   className="space-y-4 mt-4"
@@ -688,6 +702,9 @@ export default function SupplierDetails() {
                     label="قيمة الدفعة"
                     id="payment-amount-out"
                     type="number"
+                    required
+                    min={0}
+                    step="any"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                   />
@@ -698,7 +715,13 @@ export default function SupplierDetails() {
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                   />
-                  <Select value={currency} onValueChange={setCurrency}>
+                  <Select
+                    value={currency}
+                    onValueChange={(nextCurrency) => {
+                      setCurrency(nextCurrency);
+                      setExchangeRate(nextCurrency === "USD" ? 1 : 0);
+                    }}
+                  >
                     <SelectTrigger className="w-full mt-6">
                       <SelectValue placeholder="العملة المدفوع بها" />
                     </SelectTrigger>
@@ -713,6 +736,10 @@ export default function SupplierDetails() {
                   <FormInput
                     id="exchangeRate-out"
                     label="سعر الصرف"
+                    type="number"
+                    required
+                    min={0}
+                    step="any"
                     value={currency === "USD" ? 1 : exchangeRate}
                     onChange={(e) => setExchangeRate(Number(e.target.value))}
                     disabled={currency === "USD"}
@@ -855,7 +882,9 @@ export default function SupplierDetails() {
                           label="قيمة الدفعة"
                           id={`supplier-invoice-payment-${row.id}`}
                           type="number"
+                          required
                           min={0}
+                          step="any"
                           max={getInvoicePaymentMaxAmount(row)}
                           value={invoicePaymentAmount}
                           onChange={(event) =>
@@ -879,7 +908,7 @@ export default function SupplierDetails() {
                             setInvoicePaymentExchangeRate(
                               nextCurrency === "USD"
                                 ? 1
-                                : invoicePaymentExchangeRate || 1,
+                                : 0,
                             );
                           }}
                         >
@@ -902,6 +931,9 @@ export default function SupplierDetails() {
                           id={`supplier-invoice-payment-exchange-${row.id}`}
                           label="سعر الصرف"
                           type="number"
+                          required
+                          min={0}
+                          step="any"
                           value={
                             invoicePaymentCurrency === "USD"
                               ? 1

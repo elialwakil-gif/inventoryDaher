@@ -22,7 +22,7 @@ export default function CustomerPDF({
     <View style={styles.container}>
       {/* Header */}
       <Text style={styles.header}>Daher-Net</Text>
-      <Text style={styles.title}>فاتورة بيع</Text>
+      <Text style={styles.title}>بيان حساب الزبون</Text>
 
       {/* Customer Info */}
       <View style={styles.section}>
@@ -32,7 +32,7 @@ export default function CustomerPDF({
         </View>
 
         <View style={styles.infoRow}>
-          <Text>:معرف الزبون</Text>
+          <Text>:رصيد الحساب (USD)</Text>
           <Text style={styles.ltr}>{balance}</Text>
         </View>
       </View>
@@ -44,7 +44,7 @@ export default function CustomerPDF({
           <Text style={styles.cellDetails}>تفاصيل</Text>
           <Text style={styles.cellDate}>تاريخ الدفعة</Text>
           <Text style={styles.cellFromCustomer}>دفعات من الزبون</Text>
-          <Text style={styles.cellToCustomer}>فواتير عليه</Text>
+          <Text style={styles.cellToCustomer}>فواتير ودفعات للزبون</Text>
         </View>
 
         {/* Table Rows */}

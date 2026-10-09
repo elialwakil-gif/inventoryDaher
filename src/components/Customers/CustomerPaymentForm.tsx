@@ -13,6 +13,7 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { payCustomerDebt } from "@/services/transaction";
 import { toast } from "sonner";
+import { cashPaymentAmountUSD, cashPaymentErrorMessage, invalidateCashPaymentQueries } from "@/lib/cashPayment";
 
 export default function CustomerPaymentForm({
   isOpen,
@@ -21,7 +22,7 @@ export default function CustomerPaymentForm({
 }) {
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState("");
-  const [currency, setCurrency] = useState("");
+  const [currency, setCurrency] = useState("USD");
   const [exchangeRate, setExchangeRate] = useState(1);
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [receivableAccountId, setReceivableAccountId] = useState("");
@@ -40,16 +41,16 @@ export default function CustomerPaymentForm({
       toast.success("تم إضافة الدفعة بنجاح!");
       setAmount(0);
       setNote("");
-      setCurrency("");
+      setCurrency("USD");
       setExchangeRate(1);
       setPaymentAccountId(customerData?.defaultPaymentAccountId || "");
       setReceivableAccountId(customerData?.defaultReceivableAccountId || "");
       setIsOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["customer-details"] });
+      invalidateCashPaymentQueries(queryClient);
     },
     onError: (error) => {
       console.error(error);
-      toast.error("حدث خطأ أثناء إضافة الدفعة");
+      toast.error(cashPaymentErrorMessage(error));
     },
   });
 
@@ -59,6 +60,12 @@ export default function CustomerPaymentForm({
       trigger={
         <Button
           onClick={(e) => {
+            setAmount(0);
+            setNote("");
+            setCurrency("USD");
+            setExchangeRate(1);
+            setPaymentAccountId(customerData?.defaultPaymentAccountId || "");
+            setReceivableAccountId(customerData?.defaultReceivableAccountId || "");
             setIsOpen(true);
             e.stopPropagation();
           }}
@@ -81,23 +88,23 @@ export default function CustomerPaymentForm({
             toast.error("الرجاء اختيار حساب القبض وحساب العملاء");
             return;
           }
-
+          let amountUSD: number;
+          try {
+            amountUSD = cashPaymentAmountUSD(amount, currency, exchangeRate);
+          } catch (error) {
+            toast.error(cashPaymentErrorMessage(error));
+            return;
+          }
           payCustomerDebtMutation.mutate({
             customerId: customerData.id,
-            amount:
-              currency === "USD"
-                ? amount
-                : Number((amount / exchangeRate).toFixed(1)),
-            amountUSD:
-              currency === "USD"
-                ? amount
-                : Number((amount / exchangeRate).toFixed(1)),
+            amount: amountUSD,
+            amountUSD,
             amountSYP: currency === "SYP" ? amount : 0,
             amountOriginal: amount,
             note,
             currency,
             paymentCurrency: currency as "USD" | "SYP",
-            exchangeRate,
+            exchangeRate: currency === "USD" ? 1 : exchangeRate,
             amount_base: amount,
             paymentAccountId,
             receivableAccountId,
@@ -108,6 +115,8 @@ export default function CustomerPaymentForm({
           label="قيمة الدفعة"
           id="payment-amount"
           type="number"
+          min="0"
+          required
           value={amount.toString()}
           onChange={(e) => setAmount(Number(e.target.value))}
         />
@@ -120,7 +129,10 @@ export default function CustomerPaymentForm({
           onChange={(e) => setNote(e.target.value)}
         />
 
-        <Select value={currency} onValueChange={setCurrency}>
+        <Select value={currency} onValueChange={(value) => {
+          setCurrency(value);
+          setExchangeRate(value === "USD" ? 1 : 0);
+        }}>
           <SelectTrigger className="w-full mt-6">
             <SelectValue placeholder="العملة المدفوع بها" />
           </SelectTrigger>
@@ -136,6 +148,9 @@ export default function CustomerPaymentForm({
         <FormInput
           id="exchangeRate"
           label="سعر الصرف"
+          type="number"
+          min="0"
+          required
           value={currency === "USD" ? 1 : exchangeRate}
           onChange={(e) => setExchangeRate(Number(e.target.value))}
           disabled={currency === "USD"}

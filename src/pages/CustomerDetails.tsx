@@ -2,6 +2,11 @@ import CustomerPaymentForm from "@/components/Customers/CustomerPaymentForm";
 import GoodsSettlementForm from "@/components/Payments/GoodsSettlementForm";
 import GoodsSettlementActions from "@/components/Payments/GoodsSettlementActions";
 import { goodsPaymentDetails, goodsPaymentLabel } from "@/lib/goodsSettlements";
+import {
+  cashPaymentAmountUSD,
+  cashPaymentErrorMessage,
+  invalidateCashPaymentQueries,
+} from "@/lib/cashPayment";
 import AccountSelect from "@/components/Accounts/AccountSelect";
 import DetailsInputs from "@/components/Customers/DetailsInputs";
 import { DataTable } from "@/components/dashboard/DataTable";
@@ -22,6 +27,8 @@ import {
 import {
   formatExchangeRate,
   formatMoney as formatCurrencyAmount,
+  normalizeCurrency,
+  roundMoney,
   shouldShowExchangeRate,
 } from "@/lib/money";
 import { getCustomerById } from "@/services/customer";
@@ -62,9 +69,9 @@ const getPaymentMovementLabel = (payment: any) => {
   const note = String(payment?.note || "");
 
   if (payment?.sellId && payment?.type === "income") return "تسديد فاتورة";
+  if (toNumber(payment?.amountUSD ?? payment?.amount) < 0) return "دفعة للزبون";
   if (note.includes("كامل")) return "دفعة بيع نقدي";
   if (note.includes("دفعة من ثمن بيع")) return "دفعة بيع جزئي";
-  if (toNumber(payment?.amount) < 0) return "دفعة للزبون";
   return "تحصيل دين";
 };
 
@@ -87,7 +94,7 @@ export default function CustomerDetails() {
   const [isDebt, setIsDebt] = useState<"cash" | "part" | "debt">("cash");
   const [partValue, setPartValue] = useState(0);
   const [reason, setReason] = useState("");
-  const [currency, setCurrency] = useState("");
+  const [currency, setCurrency] = useState("USD");
   const [exchangeRate, setExchangeRate] = useState(1);
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [receivableAccountId, setReceivableAccountId] = useState("");
@@ -109,15 +116,14 @@ export default function CustomerDetails() {
       setInvoicePaymentNote("");
       setInvoicePaymentCurrency("USD");
       setInvoicePaymentExchangeRate(1);
-      setCurrency("");
+      setCurrency("USD");
       setExchangeRate(1);
       setIsOpen(false);
       setIsOpenTo(false);
-      queryClient.invalidateQueries({ queryKey: ["customer-details"] });
+      void invalidateCashPaymentQueries(queryClient);
     },
     onError: (error) => {
-      console.error(error);
-      toast.error("حدث خطأ أثناء إضافة الدفعة");
+      toast.error(cashPaymentErrorMessage(error));
     },
   });
 
@@ -315,8 +321,8 @@ export default function CustomerDetails() {
     ...(data?.data?.payments ?? []).map((p) => ({
       details: p?.settlementMethod === "goods" ? `${goodsPaymentLabel(p)} · ${goodsPaymentDetails(p)} · ${p.note || ""}` : p?.note,
       date: p?.date,
-      toTheCustoemr: p?.settlementMethod === "goods" ? Math.max(-toNumber(p.balanceUSDChange ?? p.amountUSD ?? p.amount), 0) : 0,
-      fromCustomer: p?.settlementMethod === "goods" ? Math.max(toNumber(p.balanceUSDChange ?? p.amountUSD ?? p.amount), 0) : p?.amount,
+      toTheCustoemr: Math.max(-toNumber(p.balanceUSDChange ?? p.amountUSD ?? p.amount), 0),
+      fromCustomer: Math.max(toNumber(p.balanceUSDChange ?? p.amountUSD ?? p.amount), 0),
     })),
   ];
 
@@ -327,18 +333,58 @@ export default function CustomerDetails() {
   const getCurrentCustomerId = () =>
     String(customer?.id || customerIdValue || "");
 
+  const setCustomerCashPaymentOpen = (nextOpen: boolean) => {
+    if (nextOpen) {
+      if (payCustomerDebtMutation.isPending || !data?.data) return;
+      setAmount(0);
+      setNote("");
+      setCurrency("USD");
+      setExchangeRate(1);
+      setPaymentAccountId(customer.defaultPaymentAccountId || "");
+      setReceivableAccountId(customer.defaultReceivableAccountId || "");
+    }
+    setIsOpenTo(nextOpen);
+  };
+
+  const submitCustomerCashPayment = () => {
+    if (payCustomerDebtMutation.isPending) return;
+    if (!paymentAccountId || !receivableAccountId) {
+      toast.error("يرجى تحديد حساب الدفع وحساب العملاء");
+      return;
+    }
+
+    try {
+      const amountUSD = cashPaymentAmountUSD(amount, currency, exchangeRate);
+      payCustomerDebtMutation.mutate({
+        customerId: getCurrentCustomerId(),
+        amount: -amountUSD,
+        amountUSD: -amountUSD,
+        amountSYP: currency === "SYP" ? -amount : 0,
+        amountOriginal: amount,
+        amount_base: amount,
+        note,
+        currency,
+        paymentCurrency: currency as "USD" | "SYP",
+        exchangeRate: currency === "USD" ? 1 : exchangeRate,
+        paymentAccountId,
+        receivableAccountId,
+      });
+    } catch (error) {
+      toast.error(cashPaymentErrorMessage(error));
+    }
+  };
+
   const openInvoicePayment = (sale: any) => {
-    const nextCurrency = sale.paymentCurrency || sale.currency || "USD";
+    const nextCurrency = normalizeCurrency(sale.paymentCurrency || sale.currency);
     const nextExchangeRate =
-      nextCurrency === "USD" ? 1 : toNumber(sale.exchangeRate) || 1;
+      nextCurrency === "USD" ? 1 : Math.max(toNumber(sale.exchangeRate), 0);
     const remainingDebt = toNumber(sale.remainingUSD ?? sale.remainingDebt);
 
     setInvoicePaymentOpenId(sale.id);
     setInvoicePaymentAmount(
       nextCurrency === "USD"
         ? remainingDebt
-        : toNumber(sale.remainingSYP) ||
-          Number((remainingDebt * nextExchangeRate).toFixed(3)),
+        : roundMoney(remainingDebt * nextExchangeRate),
     );
     setInvoicePaymentNote(`تسديد فاتورة ${String(sale.id).slice(0, 8)}`);
     setInvoicePaymentCurrency(nextCurrency);
@@ -350,19 +396,11 @@ export default function CustomerDetails() {
   };
 
   const submitInvoicePayment = (sale: any) => {
+    if (payCustomerDebtMutation.isPending) return;
     const remainingDebt = toNumber(sale.remainingUSD ?? sale.remainingDebt);
-    const amountInBaseCurrency =
-      invoicePaymentCurrency === "USD"
-        ? invoicePaymentAmount
-        : Number((invoicePaymentAmount / invoicePaymentExchangeRate).toFixed(3));
 
     if (remainingDebt <= 0) {
       toast.error("هذه الفاتورة مسددة بالكامل");
-      return;
-    }
-
-    if (amountInBaseCurrency <= 0 || amountInBaseCurrency > remainingDebt) {
-      toast.error("قيمة الدفعة يجب أن تكون أكبر من صفر ولا تتجاوز المتبقي");
       return;
     }
 
@@ -371,40 +409,44 @@ export default function CustomerDetails() {
       return;
     }
 
-    if (
-      invoicePaymentCurrency !== "USD" &&
-      invoicePaymentExchangeRate <= 0
-    ) {
-      toast.error("الرجاء إدخال سعر صرف صحيح");
-      return;
-    }
+    try {
+      const amountInBaseCurrency = cashPaymentAmountUSD(
+        invoicePaymentAmount,
+        invoicePaymentCurrency,
+        invoicePaymentExchangeRate,
+      );
+      if (amountInBaseCurrency > roundMoney(remainingDebt)) {
+        toast.error("قيمة الدفعة يجب ألا تتجاوز المتبقي من الفاتورة");
+        return;
+      }
 
-    payCustomerDebtMutation.mutate({
-      customerId: getCurrentCustomerId(),
-      sellId: sale.id,
-      amount: amountInBaseCurrency,
-      amountUSD: amountInBaseCurrency,
-      amountSYP: invoicePaymentCurrency === "SYP" ? invoicePaymentAmount : 0,
-      amountOriginal: invoicePaymentAmount,
-      note: invoicePaymentNote || `تسديد فاتورة ${String(sale.id).slice(0, 8)}`,
-      currency: invoicePaymentCurrency,
-      paymentCurrency: invoicePaymentCurrency as "USD" | "SYP",
-      exchangeRate: invoicePaymentExchangeRate,
-      amount_base: invoicePaymentAmount,
-      paymentAccountId,
-      receivableAccountId,
-    });
+      payCustomerDebtMutation.mutate({
+        customerId: getCurrentCustomerId(),
+        sellId: sale.id,
+        amount: amountInBaseCurrency,
+        amountUSD: amountInBaseCurrency,
+        amountSYP: invoicePaymentCurrency === "SYP" ? invoicePaymentAmount : 0,
+        amountOriginal: invoicePaymentAmount,
+        note: invoicePaymentNote || `تسديد فاتورة ${String(sale.id).slice(0, 8)}`,
+        currency: invoicePaymentCurrency,
+        paymentCurrency: invoicePaymentCurrency as "USD" | "SYP",
+        exchangeRate:
+          invoicePaymentCurrency === "USD" ? 1 : invoicePaymentExchangeRate,
+        amount_base: invoicePaymentAmount,
+        paymentAccountId,
+        receivableAccountId,
+      });
+    } catch (error) {
+      toast.error(cashPaymentErrorMessage(error));
+    }
   };
 
   const getInvoicePaymentMaxAmount = (sale: any) =>
     invoicePaymentCurrency === "USD"
       ? toNumber(sale.remainingUSD ?? sale.remainingDebt)
-      : Number(
-          (
-            (toNumber(sale.remainingSYP) ||
-              toNumber(sale.remainingUSD ?? sale.remainingDebt) *
-                toNumber(invoicePaymentExchangeRate))
-          ).toFixed(3),
+      : roundMoney(
+          toNumber(sale.remainingUSD ?? sale.remainingDebt) *
+            Math.max(toNumber(invoicePaymentExchangeRate), 0),
         );
 
   if (!customerIdValue) {
@@ -481,10 +523,8 @@ export default function CustomerDetails() {
                 title="دفع للزبون"
                 trigger={
                   <Button
-                    onClick={(e) => {
-                      setIsOpenTo(true);
-                      e.stopPropagation();
-                    }}
+                    type="button"
+                    disabled={payCustomerDebtMutation.isPending || !data?.data}
                     variant="destructive"
                     size="sm"
                     className="w-full"
@@ -493,42 +533,22 @@ export default function CustomerDetails() {
                   </Button>
                 }
                 isOpen={isOpenTo}
-                setIsOpen={setIsOpenTo}
+                setIsOpen={setCustomerCashPaymentOpen}
               >
                 <form
                   className="space-y-4 mt-4"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (!paymentAccountId || !receivableAccountId) {
-                      toast.error("يرجى تحديد حساب الدفع وحساب العملاء");
-                      return;
-                    }
-                    payCustomerDebtMutation.mutate({
-                      customerId: getCurrentCustomerId(),
-                      amount:
-                        currency == "USD"
-                          ? -amount
-                          : -Number((amount / exchangeRate).toFixed(1)),
-                      amountUSD:
-                        currency == "USD"
-                          ? -amount
-                          : -Number((amount / exchangeRate).toFixed(1)),
-                      amountSYP: currency === "SYP" ? -amount : 0,
-                      amountOriginal: -amount,
-                      note,
-                      currency: currency,
-                      paymentCurrency: currency as "USD" | "SYP",
-                      exchangeRate: exchangeRate,
-                      amount_base: -amount,
-                      paymentAccountId,
-                      receivableAccountId,
-                    });
+                    submitCustomerCashPayment();
                   }}
                 >
                   <FormInput
                     label="قيمة الدفعة"
                     id="payment-amount"
                     type="number"
+                    required
+                    min={0}
+                    step="any"
                     value={amount.toString()}
                     onChange={(e) => setAmount(Number(e.target.value))}
                   />
@@ -552,32 +572,35 @@ export default function CustomerDetails() {
                     filterType="receivable"
                   />
 
-                  {!(isDebt == "debt") && (
-                    <>
-                      {" "}
-                      <Select value={currency} onValueChange={setCurrency}>
-                        <SelectTrigger className="w-full mt-6">
-                          <SelectValue placeholder="العملة المدفوع بها" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {["SYP", "USD"].map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormInput
-                        id="exchangeRate"
-                        label="سعر الصرف"
-                        value={currency == "USD" ? 1 : exchangeRate}
-                        onChange={(e) =>
-                          setExchangeRate(Number(e.target.value))
-                        }
-                        disabled={currency === "USD"}
-                      />
-                    </>
-                  )}
+                  <Select
+                    value={currency}
+                    onValueChange={(nextCurrency) => {
+                      setCurrency(nextCurrency);
+                      setExchangeRate(nextCurrency === "USD" ? 1 : 0);
+                    }}
+                  >
+                    <SelectTrigger className="w-full mt-6">
+                      <SelectValue placeholder="العملة المدفوع بها" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["SYP", "USD"].map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormInput
+                    id="exchangeRate"
+                    label="سعر الصرف"
+                    type="number"
+                    required
+                    min={0}
+                    step="any"
+                    value={currency == "USD" ? 1 : exchangeRate}
+                    onChange={(e) => setExchangeRate(Number(e.target.value))}
+                    disabled={currency === "USD"}
+                  />
 
                   <Button
                     className="w-full"
@@ -713,7 +736,9 @@ export default function CustomerDetails() {
                           label="قيمة الدفعة"
                           id={`invoice-payment-${row.id}`}
                           type="number"
+                          required
                           min={0}
+                          step="any"
                           max={getInvoicePaymentMaxAmount(row)}
                           value={invoicePaymentAmount}
                           onChange={(event) =>
@@ -737,7 +762,7 @@ export default function CustomerDetails() {
                             setInvoicePaymentExchangeRate(
                               nextCurrency === "USD"
                                 ? 1
-                                : invoicePaymentExchangeRate || 1,
+                                : 0,
                             );
                           }}
                         >
@@ -760,6 +785,9 @@ export default function CustomerDetails() {
                           id={`invoice-payment-exchange-${row.id}`}
                           label="سعر الصرف"
                           type="number"
+                          required
+                          min={0}
+                          step="any"
                           value={
                             invoicePaymentCurrency === "USD"
                               ? 1
@@ -853,7 +881,8 @@ export default function CustomerDetails() {
                             }));
 
                           if (!productsToReturn.length) {
-                            toast.error("يرجى تحديد كمية إرجاع واحدة على الأقل");
+                            toast.error("يرجى تحديد كمية إرجاع واحدة على الأقل",
+                            );
                             return;
                           }
 
@@ -863,7 +892,8 @@ export default function CustomerDetails() {
                           );
 
                           if (isDebt === "part" && partValue > totalReturnValue) {
-                            toast.error("قيمة الدفع الجزئي أكبر من قيمة الإرجاع");
+                            toast.error("قيمة الدفع الجزئي أكبر من قيمة الإرجاع",
+                            );
                             return;
                           }
 
@@ -871,7 +901,8 @@ export default function CustomerDetails() {
                             isDebt === "part" &&
                             (partValue <= 0 || partValue >= totalReturnValue)
                           ) {
-                            toast.error("قيمة الدفع الجزئي يجب أن تكون أكبر من صفر وأقل من قيمة الإرجاع");
+                            toast.error("قيمة الدفع الجزئي يجب أن تكون أكبر من صفر وأقل من قيمة الإرجاع",
+                            );
                             return;
                           }
 

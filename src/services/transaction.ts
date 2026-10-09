@@ -1,4 +1,5 @@
 import apiClient from "@/lib/axios";
+import { buildCashPaymentMoney } from "@/lib/cashPayment";
 
 export type ProductPriceType =
   | "payPrice"
@@ -265,96 +266,97 @@ export async function endExchange({
   }
 }
 
-export async function payCustomerDebt(dataToSend: {
+type CashPartyPaymentInput = {
+  requestId?: string;
+  amount: number;
+  note: string;
+  currency: string;
+  exchangeRate: number;
+  amount_base: number;
+  amountUSD?: number;
+  amountSYP?: number;
+  amountOriginal?: number;
+  paymentCurrency?: "USD" | "SYP";
+  paymentAccountId: string;
+};
+
+// Keep the same request identifier after an uncertain response, including reloads.
+const pendingCashRequests = new Map<string, string>();
+const pendingStorageKey = "inventory-pending-cash-payments";
+const readPendingCashRequests = () => {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(pendingStorageKey) || "{}");
+    for (const [key, id] of Object.entries(stored)) {
+      if (typeof id === "string") pendingCashRequests.set(key, id);
+    }
+  } catch { /* Storage may be unavailable. */ }
+};
+const persistPendingCashRequests = () => {
+  try {
+    sessionStorage.setItem(pendingStorageKey, JSON.stringify(Object.fromEntries(pendingCashRequests)));
+  } catch { /* The in-memory identifier still protects retries in this tab. */ }
+};
+
+const postCashPartyPayment = async (endpoint: string, paymentData: Record<string, unknown>, requestId?: string) => {
+  const fingerprint = JSON.stringify([endpoint, paymentData]);
+  readPendingCashRequests();
+  const id = requestId || pendingCashRequests.get(fingerprint) ||
+    globalThis.crypto?.randomUUID?.() || `cash-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  pendingCashRequests.set(fingerprint, id);
+  persistPendingCashRequests();
+  try {
+    const response = await apiClient.post(endpoint, { paymentData: { ...paymentData, requestId: id } });
+    pendingCashRequests.delete(fingerprint);
+    persistPendingCashRequests();
+    return response.data;
+  } catch (error: any) {
+    const status = error.response?.status;
+    if (status >= 400 && status < 500 && ![408, 429].includes(status)) {
+      pendingCashRequests.delete(fingerprint);
+      persistPendingCashRequests();
+    }
+    throw new Error(error.response?.data?.message || "تعذر الاتصال بالخادم. عند إعادة المحاولة بالبيانات نفسها لن تُكرر الدفعة.");
+  }
+};
+
+export async function payCustomerDebt(dataToSend: CashPartyPaymentInput & {
   customerId: string;
   sellId?: string;
-  amount: number;
-  note: string;
-  currency: string;
-  exchangeRate: number;
-  amount_base: number;
-  amountUSD?: number;
-  amountSYP?: number;
-  amountOriginal?: number;
-  paymentCurrency?: "USD" | "SYP";
-  paymentAccountId: string;
   receivableAccountId: string;
 }) {
-  try {
-    const response = await apiClient.post("/api/transactions/customerPayment", {
-      paymentData: {
-        customerId: dataToSend.customerId,
-        sellId: dataToSend.sellId,
-        amount: Number(dataToSend.amount),
-        amountUSD: dataToSend.amountUSD,
-        amountSYP: dataToSend.amountSYP,
-        amountOriginal: dataToSend.amountOriginal,
-        note: dataToSend.note,
-        currency: dataToSend.currency,
-        paymentCurrency: dataToSend.paymentCurrency,
-        exchangeRate: dataToSend.exchangeRate,
-        amount_base: dataToSend.amount_base,
-        paymentAccountId: dataToSend.paymentAccountId,
-        receivableAccountId: dataToSend.receivableAccountId,
-        type: "income",
-      },
-    });
-    return response.data;
-  } catch (err: any) {
-    console.error("خطأ :", err);
-
-    if (err.response && err.response.data?.message) {
-      throw new Error(err.response.data.message);
-    }
-
-    throw new Error("فشل الاتصال بالسيرفر");
+  if (!dataToSend.customerId || !dataToSend.paymentAccountId || !dataToSend.receivableAccountId || dataToSend.paymentAccountId === dataToSend.receivableAccountId) {
+    throw new Error("يرجى تحديد الزبون وحسابي النقد والعملاء بشكل صحيح");
   }
+  const money = buildCashPaymentMoney(dataToSend);
+  if (dataToSend.sellId && money.amount < 0) throw new Error("تسديد فاتورة الزبون يتطلب دفعة من الزبون");
+  return postCashPartyPayment("/api/transactions/customerPayment", {
+    customerId: dataToSend.customerId,
+    sellId: dataToSend.sellId,
+    ...money,
+    note: dataToSend.note,
+    paymentAccountId: dataToSend.paymentAccountId,
+    receivableAccountId: dataToSend.receivableAccountId,
+  }, dataToSend.requestId);
 }
 
-export async function paySupplierDebt(dataToSend: {
+export async function paySupplierDebt(dataToSend: CashPartyPaymentInput & {
   supplierId: string;
   purchaseId?: string;
-  amount: number;
-  note: string;
-  currency: string;
-  exchangeRate: number;
-  amount_base: number;
-  amountUSD?: number;
-  amountSYP?: number;
-  amountOriginal?: number;
-  paymentCurrency?: "USD" | "SYP";
-  paymentAccountId: string;
   payableAccountId: string;
 }) {
-  try {
-    const response = await apiClient.post("/api/transactions/supplierPayment", {
-      paymentData: {
-        supplierId: dataToSend.supplierId,
-        purchaseId: dataToSend.purchaseId,
-        amount: dataToSend.amount,
-        amountUSD: dataToSend.amountUSD,
-        amountSYP: dataToSend.amountSYP,
-        amountOriginal: dataToSend.amountOriginal,
-        note: dataToSend.note,
-        currency: dataToSend.currency,
-        paymentCurrency: dataToSend.paymentCurrency,
-        exchangeRate: dataToSend.exchangeRate,
-        amount_base: dataToSend.amount_base,
-        paymentAccountId: dataToSend.paymentAccountId,
-        payableAccountId: dataToSend.payableAccountId,
-        type: "expense",
-      },
-    });
-    return response.data;
-  } catch (err: any) {
-    console.error("خطأ :", err);
-
-    if (err.response && err.response.data?.message) {
-      throw new Error(err.response.data.message);
-    }
-
-    throw new Error("فشل الاتصال بالسيرفر");
+  if (!dataToSend.supplierId || !dataToSend.paymentAccountId || !dataToSend.payableAccountId || dataToSend.paymentAccountId === dataToSend.payableAccountId) {
+    throw new Error("يرجى تحديد المورد وحسابي النقد والموردين بشكل صحيح");
   }
+  const money = buildCashPaymentMoney(dataToSend);
+  if (dataToSend.purchaseId && money.amount > 0) throw new Error("تسديد فاتورة الشراء يتطلب دفعة للمورد");
+  return postCashPartyPayment("/api/transactions/supplierPayment", {
+    supplierId: dataToSend.supplierId,
+    purchaseId: dataToSend.purchaseId,
+    ...money,
+    note: dataToSend.note,
+    paymentAccountId: dataToSend.paymentAccountId,
+    payableAccountId: dataToSend.payableAccountId,
+  }, dataToSend.requestId);
 }
 
 export async function handleCustomerReturn(newReturn: {

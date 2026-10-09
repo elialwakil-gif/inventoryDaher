@@ -32,7 +32,7 @@ export default function AccountSelect({
   const { data: accounts = [] } = useGetAccount();
 
   const filteredAccounts = accounts.filter((acc: any) => {
-    if (acc.isActive === false) {
+    if (acc.isActive === false || acc.allowTransactions === false) {
       return false;
     }
 

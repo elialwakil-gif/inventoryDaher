@@ -140,11 +140,12 @@ export default function TodaySales() {
 
   const isLoading = sellsLoading || customersLoading;
 
-  const getCustomerName = (sale: Sell) =>
+  const getCustomerName = (sale: Sell) => String(
     sale.customerName ||
     sale.customer?.name ||
     customersMap.get(String(sale.customerId || "")) ||
-    "غير محدد";
+    "غير محدد",
+  );
 
   const openSaleDetails = (sale: Sell) => {
     const id = getSaleId(sale);
