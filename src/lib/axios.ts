@@ -11,15 +11,15 @@ export const getBaseURL = () => {
     const inventoryUser = storedUser ? JSON.parse(storedUser) : null;
 
     return (
-      // "https://serverinventorydaherserver-b7gf.onrender.com"
+      // "https://dahersoftmserver.onrender.com"
       inventoryUser?.serverURL ||
       import.meta.env.VITE_API_BASE_URL ||
-      "https://serverinventorydaherserver-b7gf.onrender.com"
+      "https://dahersoftmserver.onrender.com"
     );
   } catch (error) {
     console.error("Failed to parse InventoryUser:", error);
     return (
-      import.meta.env.VITE_API_BASE_URL || "https://serverinventorydaherserver-b7gf.onrender.com"
+      import.meta.env.VITE_API_BASE_URL || "https://dahersoftmserver.onrender.com"
     );
   }
 };

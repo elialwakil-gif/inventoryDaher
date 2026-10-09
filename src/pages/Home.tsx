@@ -13,6 +13,7 @@ import {
   Receipt,
   Banknote,
   BarChart3,
+  CalendarDays,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useProducts } from "@/hooks/useProducts";
@@ -20,6 +21,7 @@ import { useSells } from "@/hooks/useSell";
 import getAllCustomer from "@/services/customer";
 import getAllPayments from "@/services/payments";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { isSaleOnDate } from "@/lib/salesDates";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("en-US", {
@@ -201,12 +203,41 @@ export default function Home() {
       .slice(0, 4);
   }, [payments, sells]);
 
+  const todaySalesSummary = useMemo(() => {
+    const todaySales = (sells || []).filter((sell) => isSaleOnDate(sell));
+    const totalUSD = todaySales.reduce(
+      (sum, sell) => sum + toNumber(sell.totalUSD ?? sell.totalPrice),
+      0,
+    );
+    const totalSYP = todaySales.reduce(
+      (sum, sell) => sum + toNumber(sell.totalSYP),
+      0,
+    );
+
+    return {
+      count: todaySales.length,
+      total: formatDualCurrency(totalUSD, totalSYP),
+    };
+  }, [sells]);
+
   const quickActions = [
     {
       title: "إضافة فاتورة",
       icon: Receipt,
       path: "/sellProduct",
-      className: "from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600",
+      className:
+        "from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600",
+    },
+    {
+      title: "مبيعات اليوم",
+      icon: CalendarDays,
+      path: "/today-sales",
+      description: sellsLoading
+        ? "جاري التحميل..."
+        : `${todaySalesSummary.count} فاتورة`,
+      amount: sellsLoading ? "" : todaySalesSummary.total,
+      className:
+        "from-cyan-700 to-teal-500 hover:from-cyan-800 hover:to-teal-600",
     },
     {
       title: "إضافة قبض",
@@ -219,7 +250,8 @@ export default function Home() {
       title: "إضافة مصروف",
       icon: Plus,
       path: "/financialStatement",
-      className: "from-rose-600 to-red-500 hover:from-rose-700 hover:to-red-600",
+      className:
+        "from-rose-600 to-red-500 hover:from-rose-700 hover:to-red-600",
     },
     {
       title: "تقرير اليوم",
@@ -362,7 +394,10 @@ export default function Home() {
                       }`}
                     >
                       {operation.sign > 0 ? "+" : "-"}
-                      {formatDualCurrency(operation.amount, operation.amountSYP)}
+                      {formatDualCurrency(
+                        operation.amount,
+                        operation.amountSYP,
+                      )}
                     </span>
                   </div>
                 ))
@@ -395,9 +430,21 @@ export default function Home() {
                     key={action.title}
                     type="button"
                     onClick={() => navigate(action.path)}
-                    className={`group flex items-center justify-between rounded-2xl bg-gradient-to-br px-4 py-4 text-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-[0.98] ${action.className}`}
+                    className={`group flex min-h-20 items-center justify-between gap-3 rounded-2xl bg-gradient-to-br px-4 py-4 text-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-[0.98] ${action.className}`}
                   >
-                    <span className="font-bold">{action.title}</span>
+                    <span className="min-w-0 text-right">
+                      <span className="block font-bold">{action.title}</span>
+                      {action.description && (
+                        <span className="mt-1 block break-words text-xs font-medium text-white/85">
+                          {action.description}
+                        </span>
+                      )}
+                      {action.amount && (
+                        <span className="mt-1 block break-words text-xs font-black text-white">
+                          {action.amount}
+                        </span>
+                      )}
+                    </span>
 
                     <span className="rounded-xl bg-white/20 p-2 transition group-hover:bg-white/30">
                       <Icon size={22} />
