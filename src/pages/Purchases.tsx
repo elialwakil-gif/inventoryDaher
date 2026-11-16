@@ -5,22 +5,14 @@ import QrScannerButton from "@/components/Products/QrScannerButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { buildInvoiceMoney, formatExchangeRate, formatMoney } from "@/lib/money";
+import { buildInvoiceMoney } from "@/lib/money";
 import { queryKeys } from "@/lib/queryKeys";
 import getAllProducts from "@/services/products";
 import { Product, purchaseInvoice } from "@/services/transaction";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PackagePlus, Search, Trash2 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-
 type SelectedPurchaseProduct = Product & {
   qty: number;
   purchasePayPrice: number;
@@ -28,19 +20,11 @@ type SelectedPurchaseProduct = Product & {
   purchaseSuperWholesalePrice: number;
   purchaseSellPrice: number;
 };
-
 const toNumber = (value: unknown, fallback = 0) => {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : fallback;
 };
-
-function FieldBlock({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function FieldBlock({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
       <label className="block text-sm font-medium leading-none">{label}</label>
@@ -48,35 +32,31 @@ function FieldBlock({
     </div>
   );
 }
-
 export default function Purchases() {
+  const pendingRequest = useRef<{
+    fingerprint: string;
+    id: string;
+  } | null>(null);
   const [supplierModalOpen, setSupplierModalOpen] = React.useState(false);
   const [supplierId, setSupplierId] = useState<string | number | null>(null);
   const [search, setSearch] = useState("");
-  const [selectedProducts, setSelectedProducts] = useState<
-    SelectedPurchaseProduct[]
-  >([]);
-  const [paymentStatus, setPaymentStatus] = useState<"cash" | "part" | "debt">(
-    "cash",
+  const [selectedProducts, setSelectedProducts] = useState<SelectedPurchaseProduct[]>(
+    [],
   );
+  const [paymentStatus, setPaymentStatus] = useState<"cash" | "part" | "debt">("cash");
   const [partValue, setPartValue] = useState("");
-  const [currency, setCurrency] = useState("USD");
-  const [exchangeRate, setExchangeRate] = useState(1);
+  const [currency, setCurrency] = useState("SYP");
   const [inventoryAccountId, setInventoryAccountId] = useState("");
   const [payableAccountId, setPayableAccountId] = useState("");
   const [paymentAccountId, setPaymentAccountId] = useState("");
-
   const queryClient = useQueryClient();
-
   const { data: products = [] } = useQuery({
     queryKey: queryKeys.products,
     queryFn: getAllProducts,
   });
-
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return [];
-
     return products
       .filter((product: Product) => {
         return (
@@ -86,7 +66,6 @@ export default function Purchases() {
       })
       .slice(0, 20);
   }, [products, search]);
-
   const totalPrice = useMemo(
     () =>
       selectedProducts.reduce(
@@ -96,30 +75,30 @@ export default function Purchases() {
       ),
     [selectedProducts],
   );
-
   const purchaseMoney = useMemo(
     () =>
       buildInvoiceMoney({
-        totalUSD: totalPrice,
+        totalPrice: totalPrice,
         paymentStatus,
         currency,
-        exchangeRate,
         partValue,
       }),
-    [currency, exchangeRate, partValue, paymentStatus, totalPrice],
+    [currency, 1, partValue, paymentStatus, totalPrice],
   );
-
+  const paidSYP =
+    paymentStatus === "part" ? toNumber(partValue) : purchaseMoney.paidAmount;
+  const remainingSYP = purchaseMoney.totalPrice - paidSYP;
   const mutation = useMutation({
     mutationFn: purchaseInvoice,
     onSuccess: () => {
+      pendingRequest.current = null;
       toast.success("تم تثبيت فاتورة الشراء بنجاح");
       setSupplierId(null);
       setSearch("");
       setSelectedProducts([]);
       setPaymentStatus("cash");
       setPartValue("");
-      setCurrency("USD");
-      setExchangeRate(1);
+      setCurrency("SYP");
       setInventoryAccountId("");
       setPayableAccountId("");
       setPaymentAccountId("");
@@ -133,24 +112,24 @@ export default function Purchases() {
       toast.error(error?.message || "تعذر تثبيت فاتورة الشراء");
     },
   });
-
   const addProduct = (product: Product) => {
     setSelectedProducts((current) => {
       const existing = current.find((item) => item.id === product.id);
-
       if (existing) {
         return current.map((item) =>
           item.id === product.id ? { ...item, qty: item.qty + 1 } : item,
         );
       }
-
       return [
         ...current,
         {
           ...product,
           qty: 1,
           purchasePayPrice: toNumber(product.payPrice),
-          purchaseWholesalePrice: toNumber(product.wholesalePrice, toNumber(product.sellPrice)),
+          purchaseWholesalePrice: toNumber(
+            product.wholesalePrice,
+            toNumber(product.sellPrice),
+          ),
           purchaseSuperWholesalePrice: toNumber(
             product.superWholesalePrice,
             toNumber(product.wholesalePrice, toNumber(product.sellPrice)),
@@ -161,25 +140,19 @@ export default function Purchases() {
     });
     setSearch("");
   };
-
   const handleQrScan = (code: string) => {
     setSearch(code);
-
     const product = products.find(
-      (item: Product) =>
-        item?.code?.trim().toLowerCase() === code.trim().toLowerCase(),
+      (item: Product) => item?.code?.trim().toLowerCase() === code.trim().toLowerCase(),
     );
-
     if (!product) {
       toast.error("لم يتم العثور على منتج بهذا الرمز");
       return false;
     }
-
     addProduct(product);
     toast.success("تمت إضافة المنتج من رمز QR");
     return true;
   };
-
   const updateSelectedProduct = (
     id: string,
     key:
@@ -196,29 +169,22 @@ export default function Purchases() {
       ),
     );
   };
-
   const removeProduct = (id: string) => {
-    setSelectedProducts((current) =>
-      current.filter((product) => product.id !== id),
-    );
+    setSelectedProducts((current) => current.filter((product) => product.id !== id));
   };
-
   const validateForm = () => {
     if (!supplierId) {
       toast.error("الرجاء اختيار المورد");
       return false;
     }
-
     if (!selectedProducts.length) {
       toast.error("الرجاء إضافة منتج واحد على الأقل");
       return false;
     }
-
     if (selectedProducts.some((product) => toNumber(product.qty) <= 0)) {
       toast.error("كل الكميات يجب أن تكون أكبر من صفر");
       return false;
     }
-
     if (
       selectedProducts.some(
         (product) =>
@@ -231,29 +197,20 @@ export default function Purchases() {
       toast.error("كل أسعار المنتج يجب أن تكون أكبر من صفر");
       return false;
     }
-
     if (!inventoryAccountId) {
       toast.error("الرجاء اختيار حساب المخزون");
       return false;
     }
-
     if (!payableAccountId) {
       toast.error("الرجاء اختيار حساب الموردين");
       return false;
     }
-
     if (paymentStatus !== "debt" && !paymentAccountId) {
       toast.error("الرجاء اختيار حساب الدفع");
       return false;
     }
-
     if (!currency) {
       toast.error("الرجاء اختيار العملة");
-      return false;
-    }
-
-    if (currency === "SYP" && toNumber(exchangeRate) <= 0) {
-      toast.error("الرجاء إدخال سعر صرف صحيح");
       return false;
     }
 
@@ -261,20 +218,37 @@ export default function Purchases() {
       toast.error("الرجاء إدخال قيمة الدفعة");
       return false;
     }
-
-    if (paymentStatus === "part" && purchaseMoney.paidUSD >= totalPrice) {
-      toast.error("الدفعة الجزئية يجب أن تكون أقل من إجمالي الفاتورة");
+    if (
+      paymentStatus === "part" &&
+      (purchaseMoney.paidAmount <= 0 ||
+        purchaseMoney.paidAmount >= totalPrice ||
+        remainingSYP <= 0)
+    ) {
+      toast.error(
+        "الدفعة الجزئية يجب أن تكون أكبر من صفر وأقل من إجمالي الفاتورة بعد التحويل",
+      );
       return false;
     }
-
     return true;
   };
-
   const submitInvoice = () => {
     if (!validateForm()) return;
-
+    const fingerprint = JSON.stringify({
+      selectedProducts,
+      supplierId,
+      paymentStatus,
+      partValue,
+      currency,
+      inventoryAccountId,
+      payableAccountId,
+      paymentAccountId,
+    });
+    if (pendingRequest.current?.fingerprint !== fingerprint) {
+      pendingRequest.current = { fingerprint, id: crypto.randomUUID() };
+    }
     mutation.mutate({
       newPurchase: {
+        requestId: pendingRequest.current.id,
         supplierId,
         name: "فاتورة شراء متعددة",
         code: `PINV-${Date.now()}`,
@@ -288,26 +262,15 @@ export default function Purchases() {
         payPrice: 0,
         totalPrice,
         paymentStatus,
-        remainingDebt: purchaseMoney.remainingUSD,
-        currency: purchaseMoney.paymentCurrency,
-        paymentCurrency: purchaseMoney.paymentCurrency,
-        priceCurrency: purchaseMoney.priceCurrency,
-        exchangeRate: purchaseMoney.exchangeRate,
-        amount_base: purchaseMoney.totalOriginal,
-        totalUSD: purchaseMoney.totalUSD,
-        totalSYP: purchaseMoney.totalSYP,
-        totalOriginal: purchaseMoney.totalOriginal,
-        paidUSD: purchaseMoney.paidUSD,
-        paidSYP: purchaseMoney.paidSYP,
-        paidOriginal: purchaseMoney.paidOriginal,
-        remainingUSD: purchaseMoney.remainingUSD,
-        remainingSYP: purchaseMoney.remainingSYP,
-        remainingOriginal: purchaseMoney.remainingOriginal,
-        partValue: purchaseMoney.paidOriginal,
+        remainingDebt: purchaseMoney.remainingDebt,
+        currency: purchaseMoney.currency,
+        amount: purchaseMoney.totalPrice,
+        paidAmount: purchaseMoney.paidAmount,
+        partValue:
+          paymentStatus === "part" ? toNumber(partValue) : purchaseMoney.paidAmount,
         inventoryAccountId,
         payableAccountId,
-        paymentAccountId:
-          paymentStatus === "debt" ? undefined : paymentAccountId,
+        paymentAccountId: paymentStatus === "debt" ? undefined : paymentAccountId,
         products: selectedProducts.map((product) => ({
           id: product.id,
           name: product.name,
@@ -326,7 +289,6 @@ export default function Purchases() {
       },
     });
   };
-
   return (
     <DashboardLayout>
       <div className="space-y-4" dir="rtl">
@@ -366,9 +328,7 @@ export default function Purchases() {
             </div>
 
             <div className="relative space-y-1.5">
-              <label className="block text-sm font-medium leading-none">
-                المنتجات
-              </label>
+              <label className="block text-sm font-medium leading-none">المنتجات</label>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
                 <div className="relative">
                   <Search className="pointer-events-none absolute right-3 top-3.5 h-4 w-4 text-muted-foreground" />
@@ -510,8 +470,7 @@ export default function Purchases() {
                     </div>
                     <p className="mt-3 text-left font-bold">
                       {(
-                        toNumber(product.qty) *
-                        toNumber(product.purchasePayPrice)
+                        toNumber(product.qty) * toNumber(product.purchasePayPrice)
                       ).toFixed(2)}
                     </p>
                   </div>
@@ -628,8 +587,7 @@ export default function Purchases() {
                         </td>
                         <td className="p-2 font-medium">
                           {(
-                            toNumber(product.qty) *
-                            toNumber(product.purchasePayPrice)
+                            toNumber(product.qty) * toNumber(product.purchasePayPrice)
                           ).toFixed(2)}
                         </td>
                         <td className="p-2 text-center">
@@ -679,38 +637,13 @@ export default function Purchases() {
             <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-4">
               <>
                 <>
-                  <FieldBlock label="العملة">
-                    <Select value={currency} onValueChange={setCurrency}>
-                      <SelectTrigger className="h-10">
-                        <SelectValue placeholder="العملة" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="SYP">SYP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FieldBlock>
-
-                  <FieldBlock label="سعر الصرف">
-                    <Input
-                      type="number"
-                      value={currency === "USD" ? 1 : exchangeRate}
-                      disabled={currency === "USD"}
-                      onChange={(event) =>
-                        setExchangeRate(toNumber(event.target.value))
-                      }
-                      placeholder="سعر الصرف"
-                      className="h-10"
-                    />
-                  </FieldBlock>
-
                   {paymentStatus !== "debt" && (
-                  <AccountSelect
-                    label="حساب الدفع"
-                    value={paymentAccountId}
-                    onChange={setPaymentAccountId}
-                    filterType="payment"
-                  />
+                    <AccountSelect
+                      label="حساب الدفع"
+                      value={paymentAccountId}
+                      onChange={setPaymentAccountId}
+                      filterType="payment"
+                    />
                   )}
                 </>
               </>
@@ -725,26 +658,6 @@ export default function Purchases() {
                     className="h-10"
                   />
                 </FieldBlock>
-              )}
-            </div>
-
-            <div className="rounded-md border bg-muted/30 p-3 text-sm">
-              <div className="grid gap-1 sm:grid-cols-3">
-                <span>الإجمالي: {formatMoney(purchaseMoney.totalUSD, "USD")}</span>
-                <span>المدفوع: {formatMoney(purchaseMoney.paidUSD, "USD")}</span>
-                <span>المتبقي: {formatMoney(purchaseMoney.remainingUSD, "USD")}</span>
-              </div>
-              {purchaseMoney.paymentCurrency === "SYP" && (
-                <div className="mt-1 grid gap-1 sm:grid-cols-3">
-                  <span>الإجمالي: {formatMoney(purchaseMoney.totalSYP, "SYP")}</span>
-                  <span>المدفوع: {formatMoney(purchaseMoney.paidSYP, "SYP")}</span>
-                  <span>المتبقي: {formatMoney(purchaseMoney.remainingSYP, "SYP")}</span>
-                </div>
-              )}
-              {purchaseMoney.paymentCurrency === "SYP" && (
-                <div className="mt-1 text-muted-foreground">
-                  سعر الصرف المعتمد: {formatExchangeRate(purchaseMoney.exchangeRate)}
-                </div>
               )}
             </div>
 

@@ -6,6 +6,7 @@ import { Product } from "@/services/transaction";
 import { getProductAlertLimit } from "@/lib/productStock";
 import type { ProductTableRow } from "@/pages/Products";
 import BulkPriceIncreaseForm from "./BulkPriceIncreaseForm";
+import CatalogProductForm from "./CatalogProductForm";
 
 type productDataTableProp = {
   productsData: Product[] | ProductTableRow[];
@@ -13,15 +14,25 @@ type productDataTableProp = {
   setOpenForm: any;
   setProductRow: any;
   setOpenTransfare: any;
-  isLoading?: boolean
+  isLoading?: boolean;
 };
 
-const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTransfare, setProductRow, isLoading }: productDataTableProp) => {
+const ProductsDataTable = ({
+  productsData,
+  setEditRow,
+  setOpenForm,
+  setOpenTransfare,
+  setProductRow,
+  isLoading,
+}: productDataTableProp) => {
   const navigate = useNavigate();
   const [openBulkPriceIncrease, setOpenBulkPriceIncrease] = useState(false);
+  const [openCatalogForm, setOpenCatalogForm] = useState(false);
   const isAdmin = useMemo(() => {
     try {
-      return JSON.parse(localStorage.getItem("InventoryUser") || "null")?.role === "admin";
+      return (
+        JSON.parse(localStorage.getItem("InventoryUser") || "null")?.role === "admin"
+      );
     } catch {
       return false;
     }
@@ -29,16 +40,26 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
   const ProductsColumns = [
     { key: "id", label: "المعرف", sortable: true, hidden: true },
     { key: "code", label: "الرمز", sortable: true },
-    { key: "name", label: "الاسم", sortable: true },
+    { key: "name", label: "الاسم", sortable: true, wrap: true },
     { key: "quantity", label: "الكمية", sortable: true },
     { key: "reservedQuantity", label: "المحجوز", sortable: true },
     { key: "availableQuantity", label: "المتاح", sortable: true },
     { key: "alertQuantity", label: "حد التنبيه", sortable: true },
     { key: "warehouse", label: "المخزن", sortable: true },
-    { key: "payPrice", label: "سعر الشراء", sortable: true, onlyAdmin: true },
-    { key: "wholesalePrice", label: "سعر الجملة", sortable: true, onlyAdmin: true },
-    { key: "superWholesalePrice", label: "سعر جملة الجملة", sortable: true, onlyAdmin: true },
-    { key: "sellPrice", label: "سعر المبيع", sortable: true, onlyAdmin: true },
+    { key: "payPrice", label: "سعر الشراء (ل.س)", sortable: true, onlyAdmin: true },
+    {
+      key: "wholesalePrice",
+      label: "سعر الجملة (ل.س)",
+      sortable: true,
+      onlyAdmin: true,
+    },
+    {
+      key: "superWholesalePrice",
+      label: "سعر جملة الجملة (ل.س)",
+      sortable: true,
+      onlyAdmin: true,
+    },
+    { key: "sellPrice", label: "سعر المبيع (ل.س)", sortable: true, onlyAdmin: true },
     { key: "category", label: "الصنف", sortable: true },
     { key: "unit", label: "الواحدة", sortable: true },
   ];
@@ -48,35 +69,34 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
       <DataTable
         isLoading={isLoading}
         title="قائمة المنتجات"
+        pageSizeOptions={[5, 10, 20, 50, 100]}
+        constrainLargePages
+        showResultCount
         titleButton={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <Button
-            onClick={() => {
-              setEditRow(null);
-              setOpenForm(true);
-            }}
-            className="w-full sm:w-auto"
-          >
-            إضافة منتج
-          </Button>
-          {isAdmin && (
-            <>
-          <Button
-            variant="outline"
-            onClick={() => setOpenBulkPriceIncrease(true)}
-            className="w-full sm:w-auto"
-           >
-            زيادة الاسعار بنسبة محددة
-          </Button>
-          <BulkPriceIncreaseForm
-            isOpen={openBulkPriceIncrease}
-            setIsOpen={setOpenBulkPriceIncrease}
-            productsData={productsData}
-          />
-            </>
-          )}
+            <Button
+              onClick={() => setOpenCatalogForm(true)}
+              className="w-full sm:w-auto"
+            >
+              إضافة منتج إلى القائمة
+            </Button>
+            {isAdmin && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setOpenBulkPriceIncrease(true)}
+                  className="w-full sm:w-auto"
+                >
+                  زيادة الاسعار بنسبة محددة
+                </Button>
+                <BulkPriceIncreaseForm
+                  isOpen={openBulkPriceIncrease}
+                  setIsOpen={setOpenBulkPriceIncrease}
+                  productsData={productsData}
+                />
+              </>
+            )}
           </div>
-          
         }
         columns={ProductsColumns}
         data={productsData}
@@ -126,8 +146,9 @@ const ProductsDataTable = ({ productsData, setEditRow, setOpenForm, setOpenTrans
           </div>
         )}
       />
+      <CatalogProductForm isOpen={openCatalogForm} setIsOpen={setOpenCatalogForm} />
     </>
   );
 };
 
-export default ProductsDataTable
+export default ProductsDataTable;

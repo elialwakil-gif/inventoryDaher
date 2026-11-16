@@ -1,5 +1,4 @@
 import type { DriverStatement } from "@/types/driverFinance";
-
 export const driverMovementLabels: Record<string, string> = {
   collection: "تحصيل زبون",
   refund: "رد نقدي",
@@ -18,9 +17,7 @@ export const driverMovementLabels: Record<string, string> = {
   goods_receive: "تسوية باستلام بضاعة",
   goods_deliver: "تسوية بتسليم بضاعة",
 };
-export const driverMovementLabel = (type: string) =>
-  driverMovementLabels[type] || type;
-
+export const driverMovementLabel = (type: string) => driverMovementLabels[type] || type;
 /** Each worksheet uses the same server-filtered statement shown and printed. */
 export function driverStatementExportSheets(
   report: DriverStatement,
@@ -28,25 +25,25 @@ export function driverStatementExportSheets(
   const s = report.summary;
   const summaryLabels: Partial<Record<keyof typeof s, string>> = {
     salesCount: "عدد الفواتير",
-    salesGrossUSD: "المبيعات قبل الحسم USD",
-    discountsUSD: "الحسومات USD",
-    salesNetUSD: "صافي المبيعات USD",
-    costUSD: "التكلفة USD",
-    profitUSD: "ربح البضاعة USD",
-    returnsUSD: "المرتجعات USD",
-    outstandingDebtUSD: "دين الزبائن المتبقي USD",
-    cashOpeningUSD: "النقد أول الفترة USD",
-    cashClosingUSD: "النقد آخر الفترة USD",
-    collectionsUSD: "التحصيل النقدي USD",
-    remittancesUSD: "المسلّم للإدارة USD",
-    advancesUSD: "السلف USD",
-    expensesUSD: "المصروفات USD",
-    refundedUSD: "الرد النقدي USD",
-    commissionEarnedUSD: "عمولة الفترة USD",
-    commissionPaidUSD: "العمولة المصروفة USD",
-    commissionOpeningUSD: "العمولة أول الفترة USD",
-    commissionClosingUSD: "العمولة المتبقية USD",
-    unknownCollectionsUSD: "تحصيلات غير مثبتة الهوية USD",
+    salesGrossAmount: "المبيعات قبل الحسم ل.س",
+    discountsAmount: "الحسومات ل.س",
+    salesNetAmount: "صافي المبيعات ل.س",
+    costAmount: "التكلفة ل.س",
+    profitAmount: "ربح البضاعة ل.س",
+    returnsAmount: "المرتجعات ل.س",
+    outstandingDebtAmount: "دين الزبائن المتبقي ل.س",
+    cashOpeningAmount: "النقد أول الفترة ل.س",
+    cashClosingAmount: "النقد آخر الفترة ل.س",
+    collectionsAmount: "التحصيل النقدي ل.س",
+    remittancesAmount: "المسلّم للإدارة ل.س",
+    advancesAmount: "السلف ل.س",
+    expensesAmount: "المصروفات ل.س",
+    refundedAmount: "الرد النقدي ل.س",
+    commissionEarnedAmount: "عمولة الفترة ل.س",
+    commissionPaidAmount: "العمولة المصروفة ل.س",
+    commissionOpeningAmount: "العمولة أول الفترة ل.س",
+    commissionClosingAmount: "العمولة المتبقية ل.س",
+    unknownCollectionsAmount: "تحصيلات غير مثبتة الهوية ل.س",
   };
   return {
     الملخص: [
@@ -56,24 +53,24 @@ export function driverStatementExportSheets(
       {
         البيان: "السيارة",
         القيمة:
-          report.vehicles.find((v) => v.id === report.filters.vehicleId)
-            ?.name || "جميع السيارات",
+          report.vehicles.find((v) => v.id === report.filters.vehicleId)?.name ||
+          "جميع السيارات",
       },
       ...Object.entries(summaryLabels).map(([key, label]) => ({
         البيان: label,
         القيمة: s[key as keyof typeof s],
       })),
       {
-        البيان: "النقد أول الفترة USD فعلي",
-        القيمة: s.cashOpeningByCurrency.USD,
+        البيان: "النقد أول الفترة ل.س فعلي",
+        القيمة: s.cashOpeningByCurrency.SYP,
       },
       {
         البيان: "النقد أول الفترة SYP فعلي",
         القيمة: s.cashOpeningByCurrency.SYP,
       },
       {
-        البيان: "النقد آخر الفترة USD فعلي",
-        القيمة: s.cashClosingByCurrency.USD,
+        البيان: "النقد آخر الفترة ل.س فعلي",
+        القيمة: s.cashClosingByCurrency.SYP,
       },
       {
         البيان: "النقد آخر الفترة SYP فعلي",
@@ -90,15 +87,14 @@ export function driverStatementExportSheets(
       السائق: sale.driverName,
       الزبون: sale.customerName,
       السيارة: sale.vehicleName,
-      الإجمالي: sale.grossUSD,
-      الحسم: sale.discountUSD,
-      الصافي: sale.netUSD,
-      التكلفة: sale.costUSD,
-      ربح_البضاعة: sale.profitUSD,
-      المرتجع: sale.returnsUSD,
-      الدين_المتبقي: sale.remainingDebtUSD,
+      الإجمالي: sale.grossAmount,
+      الحسم: sale.discount,
+      الصافي: sale.netAmount,
+      التكلفة: sale.costAmount,
+      ربح_البضاعة: sale.profitAmount,
+      المرتجع: sale.returnsAmount,
+      الدين_المتبقي: sale.remainingDebtAmount,
       العملة: sale.currency,
-      سعر_الصرف: sale.exchangeRate,
     })),
     "أصناف المبيعات": report.sales.flatMap((sale) =>
       sale.products.map((item) => ({
@@ -109,10 +105,10 @@ export function driverStatementExportSheets(
         الكود: item.code,
         الصنف: item.name,
         الكمية: item.qty,
-        سعر_التكلفة_USD: item.payPrice,
-        سعر_البيع_USD: item.sellPrice,
-        إجمالي_البيع_USD: item.qty * item.sellPrice,
-        إجمالي_التكلفة_USD: item.qty * item.payPrice,
+        سعر_التكلفة_بالليرة: item.payPrice,
+        سعر_البيع_بالليرة: item.sellPrice,
+        إجمالي_البيع_بالليرة: item.qty * item.sellPrice,
+        إجمالي_التكلفة_بالليرة: item.qty * item.payPrice,
         المستودع: item.warehouse,
       })),
     ),
@@ -126,11 +122,9 @@ export function driverStatementExportSheets(
         السائق: row.driverName,
         النوع: row.isRefund ? "رد نقدي" : "تحصيل",
         العملة: row.currency,
-        المبلغ_الأصلي: row.amountOriginal,
-        سعر_الصرف: row.exchangeRate,
-        المقابل_USD: row.amountUSD,
+        المبلغ_بالليرة: row.amount,
         النسبة: row.commissionRate ?? "غير محدد",
-        العمولة_USD: row.commissionUSD,
+        العمولة_بالليرة: row.commissionAmount,
         الملاحظات: row.note,
       })),
     "حركة النقد": report.cashMovements.map((row) => ({
@@ -139,10 +133,8 @@ export function driverStatementExportSheets(
       النوع: driverMovementLabel(row.type),
       السائق: row.driverName,
       العملة: row.currency,
-      المبلغ_الأصلي: row.amountOriginal,
-      المقابل_USD: row.amountUSD,
-      الرصيد_USD: row.balanceUSD,
-      الدولار_الفعلي: row.balanceByCurrency.USD,
+      المبلغ_بالليرة: row.amount,
+      الرصيد_بالليرة: row.balance,
       الليرة_الفعلية: row.balanceByCurrency.SYP,
       الملاحظات: row.note,
     })),
@@ -152,9 +144,9 @@ export function driverStatementExportSheets(
       السائق: row.driverName,
       النوع: driverMovementLabel(row.type),
       النسبة: row.rate ?? "—",
-      التحصيل_المؤهل_USD: row.basisUSD,
-      العمولة_USD: row.amountUSD,
-      الرصيد_USD: row.balanceUSD,
+      التحصيل_المؤهل_بالليرة: row.basisAmount,
+      العمولة_بالليرة: row.amount,
+      الرصيد_بالليرة: row.balance,
     })),
     "عهدة آخر الفترة": report.stockBalances.map((row) => ({
       السيارة: row.vehicleId,
@@ -165,7 +157,7 @@ export function driverStatementExportSheets(
       الوارد: row.incomingQuantity,
       الصادر: row.outgoingQuantity,
       آخر_الفترة: row.closingQuantity,
-      التكلفة_USD: row.costUSD,
+      التكلفة_بالليرة: row.costAmount,
     })),
     "حركة البضاعة": report.stockMovements.map((row) => ({
       السند: row.referenceId,
@@ -176,7 +168,7 @@ export function driverStatementExportSheets(
       الصنف: row.productName,
       الكود: row.code,
       الكمية: row.quantity,
-      التكلفة_USD: row.costUSD,
+      التكلفة_بالليرة: row.costAmount,
       الرصيد: row.balance,
     })),
     "المخزون الحالي": report.currentStock.products.map((row) => ({
@@ -185,7 +177,7 @@ export function driverStatementExportSheets(
       الصنف: row.productName,
       الكود: row.code,
       الكمية: row.quantity,
-      التكلفة_USD: row.costUSD,
+      التكلفة_بالليرة: row.costAmount,
     })),
     "الديون المتبقية": report.outstandingInvoices.map((sale) => ({
       الفاتورة: sale.id,
@@ -193,7 +185,7 @@ export function driverStatementExportSheets(
       السائق: sale.driverName,
       الزبون: sale.customerName,
       السيارة: sale.vehicleName,
-      المتبقي_USD: sale.remainingDebtUSD,
+      المتبقي_بالليرة: sale.remainingDebtAmount,
     })),
     المرتجعات: report.returns.map((row) => ({
       السند: row.id,
@@ -204,9 +196,9 @@ export function driverStatementExportSheets(
       الصنف: row.productName,
       الكود: row.code,
       الكمية: row.qty,
-      القيمة_USD: row.returnValue,
-      رد_نقدي_USD: row.cashRefundUSD,
-      تخفيض_الدين_USD: row.receivableCreditUSD,
+      القيمة_بالليرة: row.returnValue,
+      رد_نقدي_بالليرة: row.cashRefundAmount,
+      تخفيض_الدين_بالليرة: row.receivableCreditAmount,
     })),
     "التسويات بالبضاعة": report.settlements.flatMap((row) =>
       row.items.map((item) => ({
@@ -219,8 +211,8 @@ export function driverStatementExportSheets(
         الصنف: item.name,
         الكود: item.code,
         الكمية: item.quantity,
-        سعر_التسوية_USD: item.settlementPriceUSD,
-        قيمة_الصنف_USD: item.lineTotalUSD,
+        سعر_التسوية_بالليرة: item.settlementPriceAmount,
+        قيمة_الصنف_بالليرة: item.lineTotalAmount,
       })),
     ),
   };

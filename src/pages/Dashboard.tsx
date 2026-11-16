@@ -18,7 +18,6 @@ import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { ArrowDown, ArrowUp, Users } from "lucide-react";
 import { useState } from "react";
-
 export default function Dashboard() {
   const [isOpen, setIsOpen] = useState(false);
   const [isOpenPay, setIsOpenPay] = useState(false);
@@ -29,85 +28,78 @@ export default function Dashboard() {
     month: dayjs().format("M"),
     year: dayjs().format("YYYY"),
   });
-
   // ✅ Query Keys تشمل الشهر والسنة
   useQuery({
     queryKey: ["sells-table", balanceDate.month, balanceDate.year],
     queryFn: () => getAllSells(),
   });
-
   const { data: payments, isLoading: paymentsLoading } = useQuery({
     queryKey: ["payments-table", balanceDate.month, balanceDate.year],
     queryFn: () => getPaymentsByMonth(balanceDate),
   });
-
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ["products-table"],
     queryFn: getAllProducts,
   });
-
   const { data: supplier, isLoading: supplierLoading } = useQuery({
     queryKey: ["supplier-table"],
     queryFn: getAllSupplier,
   });
-
   const { data: customer } = useQuery({
     queryKey: ["customer-table"],
     queryFn: getAllCustomer,
   });
-
   const pieData = Object.values(products || {}).reduce(
     (acc: Record<string, number>, product: any) => {
       const warehouseName = product?.warehouse;
       const quantity = Number(product?.quantity || 0);
-
       if (!warehouseName) {
         return acc;
       }
-
       if (!acc[warehouseName]) acc[warehouseName] = 0;
       acc[warehouseName] += quantity;
       return acc;
     },
     {},
   );
-
   const pieChartData = Object.entries(pieData)
     ?.slice(0, 5)
     ?.map(([name, value]) => ({
       name,
       value,
     }));
-
   const groupedObject =
     payments?.reduce(
-      (acc: Record<string, { income: number; expense: number }>, p) => {
+      (
+        acc: Record<
+          string,
+          {
+            income: number;
+            expense: number;
+          }
+        >,
+        p,
+      ) => {
         const day = dayjs(p.date).format("YYYY-MM-DD");
-
         if (!acc[day]) {
           acc[day] = { income: 0, expense: 0 };
         }
-
-        const amount = Number(p.amountUSD ?? p.amount) || 0;
-
+        const amount = Number(p.amount) || 0;
         if (amount >= 0) {
           acc[day].income += amount; // قبض
         } else {
           acc[day].expense += Math.abs(amount); // دفع
         }
-
         return acc;
       },
       {},
     ) || {};
-
   const groupedSorted = Object.entries(groupedObject)
     .map(([date, values]: any) => ({
       date,
       ...values,
     }))
     .sort((a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf());
-
   const groupedSortedObject = groupedSorted.reduce(
     (acc, item) => {
       acc[item.date] = {
@@ -116,31 +108,39 @@ export default function Dashboard() {
       };
       return acc;
     },
-    {} as Record<string, { income: number; expense: number }>,
+    {} as Record<
+      string,
+      {
+        income: number;
+        expense: number;
+      }
+    >,
   );
-
   // ✅ تحويلها لمصفوفة
   const chartData = Object.entries(
-    groupedSortedObject as Record<string, { income: number; expense: number }>,
+    groupedSortedObject as Record<
+      string,
+      {
+        income: number;
+        expense: number;
+      }
+    >,
   ).map(([day, { income, expense }]) => ({
     day,
     income: Number(income.toFixed(3) || 0),
     expense: Number(expense.toFixed(3)) || 0,
   }));
-
   // ✅ supplierMap لتسريع البحث
   const supplierMap =
     supplier?.reduce((acc: Record<string, string>, s: any) => {
       acc[s.id] = s.name;
       return acc;
     }, {}) || {};
-
   const paymentsWithSupplier =
     payments?.map((p: any) => ({
       ...p,
       supplierName: supplierMap[p.supplierId] || "",
     })) || [];
-
   const paymentsColumns = [
     { label: "المعرف", key: "id", hidden: true },
     { label: "المبلغ", key: "amount" },
@@ -148,7 +148,6 @@ export default function Dashboard() {
     { label: "التاريخ", key: "date" },
     { label: "المورد", key: "supplierName" },
   ];
-
   const totalIncome = chartData?.reduce((sum, d) => sum + d.income, 0);
   const todayIncome = chartData
     ?.filter((d) => d.day === dayjs().format("YYYY-MM-DD"))
@@ -158,10 +157,8 @@ export default function Dashboard() {
     ?.filter((d) => d.day === dayjs().format("YYYY-MM-DD"))
     .reduce((sum, d) => sum + d.expense, 0);
   const totalCustomerBalance = customer?.reduce((sum, d) => sum + d.balance, 0);
-
   // ✅ جلب آخر العمليات
   const lastPayments = [...(paymentsWithSupplier || [])].reverse().slice(0, 5);
-
   return (
     <DashboardLayout>
       <div className="space-y-4">
@@ -254,9 +251,7 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <h2 className="font-bold text-2xl">
-              آخر العمليات المالية والمبيعات
-            </h2>
+            <h2 className="font-bold text-2xl">آخر العمليات المالية والمبيعات</h2>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <DataTable
@@ -269,21 +264,21 @@ export default function Dashboard() {
             />
 
             {/* <DataTable
-              title="ابرز العملاء"
-              data={lastCustomers.map((customer: any) => ({
-                ...customer,
-                products: customer.products?.length ?? 0,
-              }))}
-              columns={[
-                { label: "المعرف", key: "id", hidden: true },
-                { label: "الاسم", key: "name" },
-                { label: "التاريخ", key: "date" },
-                { label: "عدد المنتجات", key: "products" },
-              ]}
-              defaultPageSize={5}
-              pageSizeOptions={[5]}
-              isLoading={customerLoading}
-            /> */}
+  title="ابرز العملاء"
+  data={lastCustomers.map((customer: any) => ({
+    ...customer,
+    products: customer.products?.length ?? 0,
+  }))}
+  columns={[
+    { label: "المعرف", key: "id", hidden: true },
+    { label: "الاسم", key: "name" },
+    { label: "التاريخ", key: "date" },
+    { label: "عدد المنتجات", key: "products" },
+  ]}
+  defaultPageSize={5}
+  pageSizeOptions={[5]}
+  isLoading={customerLoading}
+/> */}
           </CardContent>
         </Card>
       </div>

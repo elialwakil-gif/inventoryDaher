@@ -1,6 +1,5 @@
 import apiClient from "@/lib/axios";
 import type { DriverMovement, DriverStatement } from "@/types/driverFinance";
-
 export type DriverStatementFilters = Partial<DriverStatement["filters"]>;
 export interface DriverCollectionPayload {
   requestId: string;
@@ -8,9 +7,8 @@ export interface DriverCollectionPayload {
   sellId: string;
   customerId: string;
   vehicleId?: string;
-  amountOriginal: number;
-  currency: "USD" | "SYP";
-  exchangeRate: number;
+  amount: number;
+  currency: "SYP";
   paymentAccountId: string;
   receivableAccountId: string;
   date?: string;
@@ -18,12 +16,7 @@ export interface DriverCollectionPayload {
 }
 export type DriverMovementPayload = Pick<
   DriverMovement,
-  | "requestId"
-  | "driverId"
-  | "type"
-  | "currency"
-  | "exchangeRate"
-  | "amountOriginal"
+  "requestId" | "driverId" | "type" | "currency" | "amount"
 > &
   Partial<
     Pick<
@@ -36,14 +29,18 @@ export type DriverMovementPayload = Pick<
       | "destinationAccountId"
       | "expenseAccountId"
       | "openingCashOriginal"
-      | "openingCommissionUSD"
+      | "openingCommissionAmount"
       | "stock"
     >
   >;
-
 function serviceError(error: unknown, fallback: string): Error {
   const failure = error as {
-    response?: { data?: { message?: string; error?: string } };
+    response?: {
+      data?: {
+        message?: string;
+        error?: string;
+      };
+    };
     message?: string;
   };
   return new Error(
@@ -53,7 +50,6 @@ function serviceError(error: unknown, fallback: string): Error {
       fallback,
   );
 }
-
 export async function getDriverStatement(
   filters: DriverStatementFilters = {},
 ): Promise<DriverStatement> {
@@ -62,15 +58,21 @@ export async function getDriverStatement(
       params: filters,
     });
     const statement = response.data?.data ?? response.data;
-    if (!statement?.filters || !statement?.summary || !Array.isArray(statement.sales) || !Array.isArray(statement.collections)) {
-      throw new Error("صيغة البيان المالي غير صحيحة. تأكد من تحديث الخادم ثم أعد المحاولة.");
+    if (
+      !statement?.filters ||
+      !statement?.summary ||
+      !Array.isArray(statement.sales) ||
+      !Array.isArray(statement.collections)
+    ) {
+      throw new Error(
+        "صيغة البيان المالي غير صحيحة. تأكد من تحديث الخادم ثم أعد المحاولة.",
+      );
     }
     return statement;
   } catch (error) {
     throw serviceError(error, "تعذر جلب البيان المالي للسائق");
   }
 }
-
 export async function recordDriverCollection(payload: DriverCollectionPayload) {
   try {
     const response = await apiClient.post(
@@ -82,13 +84,9 @@ export async function recordDriverCollection(payload: DriverCollectionPayload) {
     throw serviceError(error, "تعذر تسجيل التحصيل");
   }
 }
-
 export async function recordDriverMovement(payload: DriverMovementPayload) {
   try {
-    const response = await apiClient.post(
-      "/api/driver-statements/movements",
-      payload,
-    );
+    const response = await apiClient.post("/api/driver-statements/movements", payload);
     return response.data;
   } catch (error) {
     throw serviceError(error, "تعذر تسجيل حركة السائق");

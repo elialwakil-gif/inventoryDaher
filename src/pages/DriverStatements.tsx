@@ -34,15 +34,12 @@ import type {
   DriverStatement,
   DriverStockItem,
 } from "@/types/driverFinance";
-
 const number = (value: unknown) =>
   Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 3 });
 const money = (value: unknown) =>
-  `${Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })} USD`;
+  `${Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })} SYP`;
 const dateLabel = (value: string) =>
-  value
-    ? new Date(value).toLocaleString("ar-SY", { timeZone: "Asia/Damascus" })
-    : "—";
+  value ? new Date(value).toLocaleString("ar-SY", { timeZone: "Asia/Damascus" }) : "—";
 function currentDate() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Damascus",
@@ -68,7 +65,6 @@ function storedUser(): {
 const requestId = () =>
   globalThis.crypto?.randomUUID?.() ||
   `driver-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
 function ReportTable({
   title,
   headers,
@@ -84,9 +80,7 @@ function ReportTable({
     <Card className="driver-report-table break-inside-avoid">
       <CardHeader className="p-4">
         <CardTitle className="text-lg">{title}</CardTitle>
-        {description && (
-          <p className="text-sm text-muted-foreground">{description}</p>
-        )}
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
@@ -94,10 +88,7 @@ function ReportTable({
             <thead className="bg-muted/40">
               <tr>
                 {headers.map((header) => (
-                  <th
-                    key={header}
-                    className="whitespace-nowrap px-3 py-3 font-medium"
-                  >
+                  <th key={header} className="whitespace-nowrap px-3 py-3 font-medium">
                     {header}
                   </th>
                 ))}
@@ -131,7 +122,6 @@ function ReportTable({
     </Card>
   );
 }
-
 function SummaryCard({
   label,
   value,
@@ -150,27 +140,16 @@ function SummaryCard({
         <p className="mt-2 break-words text-xl font-semibold" dir="ltr">
           {value}
         </p>
-        {detail && (
-          <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
-        )}
+        {detail && <p className="mt-2 text-xs text-muted-foreground">{detail}</p>}
       </CardContent>
     </Card>
   );
 }
-
-function SourceReference({
-  report,
-  id,
-}: {
-  report: DriverStatement;
-  id: string;
-}) {
+function SourceReference({ report, id }: { report: DriverStatement; id: string }) {
   const [open, setOpen] = useState(false);
   const payment = report.collections.find((row) => row.id === id);
   const cash = report.cashMovements.find((row) => row.referenceId === id);
-  const commission = report.commissionRows.find(
-    (row) => row.referenceId === id,
-  );
+  const commission = report.commissionRows.find((row) => row.referenceId === id);
   const stock = report.stockMovements.filter((row) => row.referenceId === id);
   const returned = report.returns.find((row) => row.id === id);
   const settlement = report.settlements.find((row) => row.id === id);
@@ -213,16 +192,16 @@ function SourceReference({
           <>
             <p>الزبون: {payment.customerName}</p>
             <p>
-              المبلغ: {number(payment.amountOriginal)} {payment.currency} —{" "}
-              {money(payment.amountUSD)}
+              المبلغ: {number(payment.amount)} {payment.currency} —{" "}
+              {money(payment.amount)}
             </p>
-            <p>سعر الصرف المحفوظ: {number(payment.exchangeRate)}</p>
+
             <p>
               نسبة التحصيل المحفوظة:{" "}
               {payment.commissionRate === null
                 ? "غير محدد"
                 : `${payment.commissionRate}%`}{" "}
-              — العمولة: {money(payment.commissionUSD)}
+              — العمولة: {money(payment.commissionAmount)}
             </p>
             {payment.sellId && <p>الفاتورة: {payment.sellId}</p>}
           </>
@@ -231,20 +210,17 @@ function SourceReference({
           <>
             <p>الحركة: {driverMovementLabel(cash.type)}</p>
             <p>
-              أثر الحركة على النقد: {number(cash.amountOriginal)}{" "}
-              {cash.currency} — {money(cash.amountUSD)}
+              أثر الحركة على النقد: {number(cash.amount)} {cash.currency} —{" "}
+              {money(cash.amount)}
             </p>
-            <p>رصيد السائق بعد الحركة: {money(cash.balanceUSD)}</p>
-            <p>
-              النقد الفعلي: {number(cash.balanceByCurrency.USD)} USD +{" "}
-              {number(cash.balanceByCurrency.SYP)} SYP
-            </p>
+            <p>رصيد السائق بعد الحركة: {money(cash.balance)}</p>
+            <p>النقد الفعلي: {number(cash.balanceByCurrency.SYP)} ل.س</p>
           </>
         )}
         {commission && (
           <>
-            <p>أثر الحركة على مستحقات السائق: {money(commission.amountUSD)}</p>
-            <p>المستحق بعد الحركة: {money(commission.balanceUSD)}</p>
+            <p>أثر الحركة على مستحقات السائق: {money(commission.amount)}</p>
+            <p>المستحق بعد الحركة: {money(commission.balance)}</p>
           </>
         )}
         {returned && (
@@ -255,8 +231,8 @@ function SourceReference({
             </p>
             <p>
               قيمة المرتجع: {money(returned.returnValue)} — رد نقدي{" "}
-              {money(returned.cashRefundUSD)} — تخفيض الدين{" "}
-              {money(returned.receivableCreditUSD)}
+              {money(returned.cashRefundAmount)} — تخفيض الدين{" "}
+              {money(returned.receivableCreditAmount)}
             </p>
           </>
         )}
@@ -264,14 +240,13 @@ function SourceReference({
           <>
             <p>الزبون: {settlement.customerName}</p>
             <p>
-              تسوية{" "}
-              {settlement.goodsDirection === "receive" ? "باستلام" : "بتسليم"}{" "}
-              بضاعة: {money(settlement.amountUSD)}
+              تسوية {settlement.goodsDirection === "receive" ? "باستلام" : "بتسليم"}{" "}
+              بضاعة: {money(settlement.amount)}
             </p>
             {settlement.items.map((item, i) => (
               <p key={i}>
                 {item.name} — {number(item.quantity)} ×{" "}
-                {money(item.settlementPriceUSD)}
+                {money(item.settlementPriceAmount)}
               </p>
             ))}
           </>
@@ -293,7 +268,6 @@ function SourceReference({
     </PopupForm>
   );
 }
-
 type ActionType = "collection" | DriverMovementPayload["type"];
 const actionLabels: Record<ActionType, string> = {
   collection: "تحصيل من زبون",
@@ -303,7 +277,6 @@ const actionLabels: Record<ActionType, string> = {
   expense: "مصروف من عهدة السائق",
   opening: "تسجيل رصيد افتتاحي",
 };
-
 function DriverActionForm({
   report,
   onSaved,
@@ -319,8 +292,7 @@ function DriverActionForm({
   const [sellId, setSellId] = useState("");
   const [vehicleId, setVehicleId] = useState(report.filters.vehicleId || "");
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState<"USD" | "SYP">("USD");
-  const [exchangeRate, setExchangeRate] = useState("1");
+  const [currency, setCurrency] = useState<"SYP">("SYP");
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [receivableAccountId, setReceivableAccountId] = useState("");
   const [sourceAccountId, setSourceAccountId] = useState("");
@@ -345,21 +317,19 @@ function DriverActionForm({
     enabled: open && action === "collection" && Boolean(driverId),
   });
   const availableInvoices = (invoices.data?.outstandingInvoices || []).filter(
-    (sale) => sale.remainingDebtUSD > 0,
+    (sale) => sale.remainingDebtAmount > 0,
   );
   const invoice = availableInvoices.find((sale) => sale.id === sellId);
   const vehicleStock = report.currentStock.products.filter(
     (item) => item.vehicleId === vehicleId,
   );
-
   const reset = () => {
     setSubmissionId(requestId());
     setSellId("");
     setAmount("");
     setDate("");
     setNote("");
-    setCurrency("USD");
-    setExchangeRate("1");
+    setCurrency("SYP");
     setPaymentAccountId("");
     setReceivableAccountId("");
     setSourceAccountId("");
@@ -374,9 +344,8 @@ function DriverActionForm({
     mutationFn: async () => {
       if (!driverId) throw new Error("اختر سائقًا محددًا لتسجيل الحركة");
       const numericAmount = Number(amount);
-      const rate = currency === "USD" ? 1 : Number(exchangeRate);
-      if (!Number.isFinite(rate) || rate <= 0)
-        throw new Error("أدخل سعر صرف صحيحًا");
+      const rate = Number(1);
+
       if (
         !Number.isFinite(numericAmount) ||
         (action !== "opening" && (!amount.trim() || numericAmount <= 0))
@@ -386,9 +355,8 @@ function DriverActionForm({
         requestId: submissionId,
         driverId,
         vehicleId: vehicleId || undefined,
-        amountOriginal: numericAmount,
+        amount: numericAmount,
         currency,
-        exchangeRate: rate,
         ...(admin && date ? { date: new Date(date).toISOString() } : {}),
         note: note.trim(),
       };
@@ -396,7 +364,7 @@ function DriverActionForm({
         if (!invoice) throw new Error("اختر فاتورة لها مبلغ متبقٍ");
         if (!paymentAccountId || !receivableAccountId)
           throw new Error("اختر حساب القبض وحساب العملاء");
-        if (numericAmount / rate > invoice.remainingDebtUSD + 0.00001)
+        if (numericAmount / rate > invoice.remainingDebtAmount + 0.00001)
           throw new Error("التحصيل أكبر من الدين المتبقي في الفاتورة");
         return recordDriverCollection({
           ...base,
@@ -409,15 +377,9 @@ function DriverActionForm({
       }
       if (action !== "opening" && !sourceAccountId)
         throw new Error("اختر الحساب المصدر للحركة");
-      if (
-        (action === "remittance" || action === "advance") &&
-        !destinationAccountId
-      )
+      if ((action === "remittance" || action === "advance") && !destinationAccountId)
         throw new Error("اختر الحساب المستلم للحركة");
-      if (
-        (action === "expense" || action === "commission_payout") &&
-        !expenseAccountId
-      )
+      if ((action === "expense" || action === "commission_payout") && !expenseAccountId)
         throw new Error("اختر حساب المصروف أو عمولة السائق");
       if (action === "opening" && !note.trim())
         throw new Error("دوّن مصدر مطابقة الرصيد الافتتاحي في الملاحظات");
@@ -428,8 +390,8 @@ function DriverActionForm({
           (item) =>
             !Number.isFinite(item.quantity) ||
             item.quantity < 0 ||
-            !Number.isFinite(item.costUSD) ||
-            item.costUSD < 0,
+            !Number.isFinite(item.costAmount) ||
+            item.costAmount < 0,
         )
       )
         throw new Error("تأكد من كميات وتكلفة العهدة الافتتاحية");
@@ -445,7 +407,7 @@ function DriverActionForm({
         ...(action === "opening"
           ? {
               openingCashOriginal: numericAmount,
-              openingCommissionUSD: Number(openingCommission),
+              openingCommissionAmount: Number(openingCommission),
               stock: openingStock,
             }
           : {}),
@@ -459,7 +421,6 @@ function DriverActionForm({
     },
     onError: (error) => toast.error((error as Error).message),
   });
-
   return (
     <PopupForm
       title={actionLabels[action]}
@@ -525,9 +486,7 @@ function DriverActionForm({
                     (sale) => sale.id === value,
                   );
                   setPaymentAccountId(selectedInvoice?.paymentAccountId || "");
-                  setReceivableAccountId(
-                    selectedInvoice?.receivableAccountId || "",
-                  );
+                  setReceivableAccountId(selectedInvoice?.receivableAccountId || "");
                 }}
                 disabled={invoices.isFetching}
               >
@@ -538,7 +497,7 @@ function DriverActionForm({
                   {availableInvoices.map((sale) => (
                     <SelectItem key={sale.id} value={sale.id}>
                       {sale.customerName} — {sale.id.slice(-8)} — المتبقي{" "}
-                      {money(sale.remainingDebtUSD)}
+                      {money(sale.remainingDebtAmount)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -561,13 +520,11 @@ function DriverActionForm({
                 </Button>
               </div>
             )}
-            {!invoices.isFetching &&
-              !invoices.isError &&
-              !availableInvoices.length && (
-                <p className="text-sm text-muted-foreground">
-                  لا توجد فواتير لها دين متبقٍ لهذا السائق.
-                </p>
-              )}
+            {!invoices.isFetching && !invoices.isError && !availableInvoices.length && (
+              <p className="text-sm text-muted-foreground">
+                لا توجد فواتير لها دين متبقٍ لهذا السائق.
+              </p>
+            )}
             <AccountSelect
               label="حساب القبض"
               value={paymentAccountId}
@@ -630,8 +587,7 @@ function DriverActionForm({
               <AccountSelect
                 label={
                   action === "advance" ||
-                  (action === "commission_payout" &&
-                    payoutSource === "treasury")
+                  (action === "commission_payout" && payoutSource === "treasury")
                     ? "حساب الخزينة الدافع"
                     : "حساب النقد بعهدة السائق"
                 }
@@ -655,9 +611,7 @@ function DriverActionForm({
             {(action === "expense" || action === "commission_payout") && (
               <AccountSelect
                 label={
-                  action === "expense"
-                    ? "حساب المصروف"
-                    : "حساب مصروف عمولة السائق"
+                  action === "expense" ? "حساب المصروف" : "حساب مصروف عمولة السائق"
                 }
                 value={expenseAccountId}
                 onChange={setExpenseAccountId}
@@ -684,39 +638,18 @@ function DriverActionForm({
           </div>
           <div className="space-y-2">
             <Label>العملة</Label>
-            <Select
-              value={currency}
-              onValueChange={(value) => {
-                setCurrency(value as typeof currency);
-                if (value === "USD") setExchangeRate("1");
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="USD">دولار USD</SelectItem>
-                <SelectItem value="SYP">ليرة سورية SYP</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-          {currency === "SYP" && (
+          {
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="driver-action-rate">عدد الليرات لكل دولار</Label>
-              <Input
-                id="driver-action-rate"
-                type="number"
-                min="0.000001"
-                step="any"
-                value={exchangeRate}
-                onChange={(event) => setExchangeRate(event.target.value)}
-              />
+              <Label htmlFor="driver-action-rate">عدد الليرات لكل ليرة سورية</Label>
             </div>
-          )}
+          }
           {admin && (
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="driver-action-date">
-                {action === "opening" ? "تاريخ ووقت رصيد البداية (فارغ = الآن)" : "تاريخ الحركة (فارغ = الآن)"}
+                {action === "opening"
+                  ? "تاريخ ووقت رصيد البداية (فارغ = الآن)"
+                  : "تاريخ الحركة (فارغ = الآن)"}
               </Label>
               <Input
                 id="driver-action-date"
@@ -730,13 +663,13 @@ function DriverActionForm({
         {action === "opening" && (
           <div className="space-y-3 rounded-md border p-3">
             <p className="text-xs text-muted-foreground">
-              أدخل الأرصدة المؤكدة في تاريخ ووقت بداية السجل؛ تُحسب الأرصدة بعدها
-              من الحركات اللاحقة. عهدة البضاعة الافتتاحية توثق الكميات الموجودة
-              فعليًا في ذلك التاريخ. إدخالها يوثق العهدة المالية؛ تحميل البضاعة
-              الفعلي يُسجل من صفحة السيارات.
+              أدخل الأرصدة المؤكدة في تاريخ ووقت بداية السجل؛ تُحسب الأرصدة بعدها من
+              الحركات اللاحقة. عهدة البضاعة الافتتاحية توثق الكميات الموجودة فعليًا في
+              ذلك التاريخ. إدخالها يوثق العهدة المالية؛ تحميل البضاعة الفعلي يُسجل من
+              صفحة السيارات.
             </p>
             <Label htmlFor="opening-commission">
-              رصيد العمولة الافتتاحي بالدولار (المستحق للسائق)
+              رصيد العمولة الافتتاحي بالليرة السورية (المستحق للسائق)
             </Label>
             <Input
               id="opening-commission"
@@ -756,9 +689,7 @@ function DriverActionForm({
                     );
                     if (
                       item &&
-                      !openingStock.some(
-                        (product) => product.productId === productId,
-                      )
+                      !openingStock.some((product) => product.productId === productId)
                     )
                       setOpeningStock((current) => [
                         ...current,
@@ -767,7 +698,7 @@ function DriverActionForm({
                           productName: item.productName,
                           code: item.code,
                           quantity: item.quantity,
-                          costUSD: item.costUSD,
+                          costAmount: item.costAmount,
                         },
                       ]);
                   }}
@@ -793,10 +724,7 @@ function DriverActionForm({
               </>
             )}
             {openingStock.map((item, index) => (
-              <div
-                key={item.productId}
-                className="space-y-2 rounded border p-2"
-              >
+              <div key={item.productId} className="space-y-2 rounded border p-2">
                 <p className="text-sm">{item.productName}</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -821,19 +749,19 @@ function DriverActionForm({
                     />
                   </div>
                   <div>
-                    <Label>تكلفة الوحدة USD</Label>
+                    <Label>تكلفة الوحدة SYP</Label>
                     <Input
                       type="number"
                       min="0"
                       step="any"
-                      value={item.costUSD}
+                      value={item.costAmount}
                       onChange={(event) =>
                         setOpeningStock((current) =>
                           current.map((stock, i) =>
                             i === index
                               ? {
                                   ...stock,
-                                  costUSD: Number(event.target.value),
+                                  costAmount: Number(event.target.value),
                                 }
                               : stock,
                           ),
@@ -847,9 +775,7 @@ function DriverActionForm({
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    setOpeningStock((current) =>
-                      current.filter((_, i) => i !== index),
-                    )
+                    setOpeningStock((current) => current.filter((_, i) => i !== index))
                   }
                 >
                   حذف الصنف
@@ -868,8 +794,8 @@ function DriverActionForm({
         </div>
         {action === "collection" && (
           <p className="text-sm text-muted-foreground">
-            تحتسب العمولة من المبلغ المقبوض وفق نسبة السائق السارية بتاريخ
-            التحصيل، وتُحفظ مع السند.
+            تحتسب العمولة من المبلغ المقبوض وفق نسبة السائق السارية بتاريخ التحصيل،
+            وتُحفظ مع السند.
           </p>
         )}
         <Button
@@ -888,7 +814,6 @@ function DriverActionForm({
     </PopupForm>
   );
 }
-
 export default function DriverStatements() {
   const user = useMemo(storedUser, []);
   const admin = user.role === "admin";
@@ -930,17 +855,14 @@ export default function DriverStatements() {
   const exportExcel = () => {
     if (!report) return;
     const workbook = XLSX.utils.book_new();
-    Object.entries(driverStatementExportSheets(report)).forEach(
-      ([name, rows]) =>
-        XLSX.utils.book_append_sheet(
-          workbook,
-          XLSX.utils.json_to_sheet(
-            rows.length
-              ? rows
-              : [{ ملاحظة: "لا توجد بيانات في الفترة المختارة" }],
-          ),
-          name,
+    Object.entries(driverStatementExportSheets(report)).forEach(([name, rows]) =>
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(
+          rows.length ? rows : [{ ملاحظة: "لا توجد بيانات في الفترة المختارة" }],
         ),
+        name,
+      ),
     );
     XLSX.writeFile(
       workbook,
@@ -949,11 +871,7 @@ export default function DriverStatements() {
   };
   const invoiceLink = (sale: Pick<DriverSale, "id">) =>
     admin ? (
-      <Link
-        className="text-primary underline"
-        to="/sellDetails"
-        state={sale.id}
-      >
+      <Link className="text-primary underline" to="/sellDetails" state={sale.id}>
         {sale.id.slice(-8)}
       </Link>
     ) : (
@@ -961,11 +879,7 @@ export default function DriverStatements() {
     );
   const customerLink = (id: string | undefined, name: string) =>
     admin && id ? (
-      <Link
-        className="text-primary underline"
-        to="/CustomerDetails"
-        state={{ id }}
-      >
+      <Link className="text-primary underline" to="/CustomerDetails" state={{ id }}>
         {name || id}
       </Link>
     ) : (
@@ -997,8 +911,8 @@ export default function DriverStatements() {
                   البيان المالي للسائقين
                 </CardTitle>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  المبيعات والتحصيلات وعهدة النقد والبضاعة ومستحقات كل سائق خلال
-                  الفترة المختارة.
+                  المبيعات والتحصيلات وعهدة النقد والبضاعة ومستحقات كل سائق خلال الفترة
+                  المختارة.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1059,11 +973,7 @@ export default function DriverStatements() {
                 ) : (
                   <Input
                     disabled
-                    value={
-                      report?.driver?.username ||
-                      user.username ||
-                      "بياني المالي"
-                    }
+                    value={report?.driver?.username || user.username || "بياني المالي"}
                   />
                 )}
               </div>
@@ -1071,9 +981,7 @@ export default function DriverStatements() {
                 <Label>السيارة</Label>
                 <Select
                   value={vehicleId || "all"}
-                  onValueChange={(value) =>
-                    setVehicleId(value === "all" ? "" : value)
-                  }
+                  onValueChange={(value) => setVehicleId(value === "all" ? "" : value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="جميع السيارات" />
@@ -1160,16 +1068,9 @@ export default function DriverStatements() {
           </p>
         )}
         {query.isError && (
-          <div
-            role="alert"
-            className="rounded-md border border-destructive/40 p-4"
-          >
+          <div role="alert" className="rounded-md border border-destructive/40 p-4">
             <p className="text-destructive">{(query.error as Error).message}</p>
-            <Button
-              variant="outline"
-              className="mt-3"
-              onClick={() => query.refetch()}
-            >
+            <Button variant="outline" className="mt-3" onClick={() => query.refetch()}>
               إعادة المحاولة
             </Button>
           </div>
@@ -1181,8 +1082,7 @@ export default function DriverStatements() {
                 بيان {report.driver?.username || "جميع السائقين"}
               </h1>
               <p className="mt-1 text-sm">
-                الفترة: {report.filters.dateFrom} إلى {report.filters.dateTo} —
-                السيارة:{" "}
+                الفترة: {report.filters.dateFrom} إلى {report.filters.dateTo} — السيارة:{" "}
                 {report.vehicles.find(
                   (vehicle) => vehicle.id === report.filters.vehicleId,
                 )?.name || "جميع السيارات"}
@@ -1204,90 +1104,77 @@ export default function DriverStatements() {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <SummaryCard
                 label="صافي مبيعات الفترة"
-                value={money(s.salesNetUSD)}
-                detail={`${s.salesCount} فاتورة — حسم ${money(s.discountsUSD)} — مرتجعات ${money(s.returnsUSD)}`}
+                value={money(s.salesNetAmount)}
+                detail={`${s.salesCount} فاتورة — حسم ${money(s.discountsAmount)} — مرتجعات ${money(s.returnsAmount)}`}
               />
               <SummaryCard
                 label="التحصيل النقدي الفعلي"
-                value={money(s.collectionsUSD)}
-                detail={`رد نقدي: ${money(s.refundedUSD)}`}
+                value={money(s.collectionsAmount)}
+                detail={`رد نقدي: ${money(s.refundedAmount)}`}
               />
               <SummaryCard
                 label="دين الزبائن المتبقي"
-                value={money(s.outstandingDebtUSD)}
+                value={money(s.outstandingDebtAmount)}
                 detail="المتبقي على جميع فواتير السائق حتى نهاية الفترة"
               />
-              <SummaryCard
-                label="المسلّم للإدارة"
-                value={money(s.remittancesUSD)}
-              />
+              <SummaryCard label="المسلّم للإدارة" value={money(s.remittancesAmount)} />
               <SummaryCard
                 label="النقد المتبقي مع السائق آخر الفترة"
-                value={money(s.cashClosingUSD)}
-                detail={
-                  <>
-                    {number(s.cashClosingByCurrency.USD)} USD فعلي +{" "}
-                    {number(s.cashClosingByCurrency.SYP)} SYP فعلي
-                  </>
-                }
+                value={money(s.cashClosingAmount)}
+                detail={<>{number(s.cashClosingByCurrency.SYP)} ل.س</>}
                 emphasized
               />
               <SummaryCard
                 label="عمولة التحصيل خلال الفترة"
-                value={money(s.commissionEarnedUSD)}
+                value={money(s.commissionEarnedAmount)}
                 detail="تُحفظ نسبة كل تحصيل وقت القبض"
               />
               <SummaryCard
                 label="العمولة المصروفة خلال الفترة"
-                value={money(s.commissionPaidUSD)}
+                value={money(s.commissionPaidAmount)}
               />
               <SummaryCard
                 label="العمولة المتبقية المستحقة للسائق"
-                value={money(s.commissionClosingUSD)}
-                detail={`رصيد بداية الفترة: ${money(s.commissionOpeningUSD)}`}
+                value={money(s.commissionClosingAmount)}
+                detail={`رصيد بداية الفترة: ${money(s.commissionOpeningAmount)}`}
                 emphasized
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <SummaryCard
                 label="رصيد النقد بداية الفترة"
-                value={money(s.cashOpeningUSD)}
-                detail={`${number(s.cashOpeningByCurrency.USD)} USD + ${number(s.cashOpeningByCurrency.SYP)} SYP`}
+                value={money(s.cashOpeningAmount)}
+                detail={`${number(s.cashOpeningByCurrency.SYP)} ل.س`}
               />
               <SummaryCard
                 label="سلف ومصروفات الفترة"
-                value={`${money(s.advancesUSD)} / ${money(s.expensesUSD)}`}
+                value={`${money(s.advancesAmount)} / ${money(s.expensesAmount)}`}
                 detail="السلفة وارد للعهدة والمصروف صادر منها"
               />
               <SummaryCard
                 label="ربح البضاعة المباعة"
-                value={money(s.profitUSD)}
-                detail={`التكلفة ${money(s.costUSD)} — ربح البضاعة مستقل عن عمولة التحصيل`}
+                value={money(s.profitAmount)}
+                detail={`التكلفة ${money(s.costAmount)} — ربح البضاعة مستقل عن عمولة التحصيل`}
               />
               <SummaryCard
                 label="البضاعة المتبقية آخر الفترة"
                 value={`${number(report.stockBalances.reduce((sum, row) => sum + row.closingQuantity, 0))} وحدة`}
-                detail={`قيمتها بالتكلفة: ${money(report.stockBalances.reduce((sum, row) => sum + row.closingQuantity * row.costUSD, 0))}`}
+                detail={`قيمتها بالتكلفة: ${money(report.stockBalances.reduce((sum, row) => sum + row.closingQuantity * row.costAmount, 0))}`}
               />
             </div>
-            <p className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
-              القيم الإجمالية بالدولار تعتمد سعر الصرف المحفوظ لكل حركة. أرصدة
-              النقد الفعلية بالدولار والليرة معروضة كل بعملتها. عهدة آخر الفترة
-              تُستخرج من سجل الحركات والأرصدة الافتتاحية؛ المخزون الحالي ظاهر
-              بتاريخ مستقل أدناه.
-            </p>
+
             <ReportTable
               title="تفاصيل فواتير المبيعات"
               headers={[
                 "الفاتورة / التاريخ",
                 "الزبون / السيارة / السائق",
-                "قبل الحسم USD",
-                "الحسم USD",
-                "الصافي USD",
-                "التكلفة USD",
-                "ربح البضاعة USD",
-                "المرتجع USD",
-                "الدين المتبقي USD",
+                "قبل الحسم ل.س",
+                "الحسم ل.س",
+                "الصافي ل.س",
+                "التكلفة ل.س",
+                "ربح البضاعة ل.س",
+                "المرتجع ل.س",
+                "الدين المتبقي ل.س",
               ]}
               rows={report.sales.map((sale) => [
                 <>
@@ -1303,13 +1190,13 @@ export default function DriverStatements() {
                     {` — ${sale.driverName || "غير محدد"}`}
                   </p>
                 </>,
-                number(sale.grossUSD),
-                number(sale.discountUSD),
-                number(sale.netUSD),
-                number(sale.costUSD),
-                number(sale.profitUSD),
-                number(sale.returnsUSD),
-                number(sale.remainingDebtUSD),
+                number(sale.grossAmount),
+                number(sale.discount),
+                number(sale.netAmount),
+                number(sale.costAmount),
+                number(sale.profitAmount),
+                number(sale.returnsAmount),
+                number(sale.remainingDebtAmount),
               ])}
             />
             <ReportTable
@@ -1321,10 +1208,10 @@ export default function DriverStatements() {
                 "السائق",
                 "الصنف / الكود",
                 "الكمية",
-                "تكلفة الوحدة USD",
-                "سعر البيع USD",
-                "إجمالي التكلفة USD",
-                "إجمالي البيع USD",
+                "تكلفة الوحدة ل.س",
+                "سعر البيع ل.س",
+                "إجمالي التكلفة ل.س",
+                "إجمالي البيع ل.س",
                 "المستودع",
               ]}
               rows={report.sales.flatMap((sale) =>
@@ -1354,7 +1241,7 @@ export default function DriverStatements() {
                 "السائق",
                 "الزبون",
                 "السيارة",
-                "المبلغ المتبقي USD",
+                "المبلغ المتبقي ل.س",
               ]}
               rows={report.outstandingInvoices.map((sale) => [
                 invoiceLink(sale),
@@ -1362,7 +1249,7 @@ export default function DriverStatements() {
                 sale.driverName,
                 customerLink(sale.customerId, sale.customerName),
                 sale.vehicleName,
-                number(sale.remainingDebtUSD),
+                number(sale.remainingDebtAmount),
               ])}
             />
             <ReportTable
@@ -1374,16 +1261,14 @@ export default function DriverStatements() {
                 "الزبون",
                 "الصنف / الكود",
                 "الكمية المرتجعة",
-                "قيمة المرتجع USD",
-                "رد نقدي USD",
-                "تخفيض الدين USD",
+                "قيمة المرتجع ل.س",
+                "رد نقدي ل.س",
+                "تخفيض الدين ل.س",
               ]}
               rows={report.returns.map((row) => [
                 <>
                   <SourceReference report={report} id={row.id} />
-                  <p className="text-xs text-muted-foreground">
-                    {dateLabel(row.date)}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{dateLabel(row.date)}</p>
                 </>,
                 invoiceLink({ id: row.sellId }),
                 row.driverName,
@@ -1394,8 +1279,8 @@ export default function DriverStatements() {
                 </>,
                 number(row.qty),
                 number(row.returnValue),
-                number(row.cashRefundUSD),
-                number(row.receivableCreditUSD),
+                number(row.cashRefundAmount),
+                number(row.receivableCreditAmount),
               ])}
             />
             <ReportTable
@@ -1408,8 +1293,8 @@ export default function DriverStatements() {
                 "الاتجاه",
                 "الصنف / الكود",
                 "الكمية",
-                "سعر التسوية USD",
-                "قيمة الصنف USD",
+                "سعر التسوية ل.س",
+                "قيمة الصنف ل.س",
               ]}
               rows={report.settlements.flatMap((row) =>
                 row.items.map((item) => [
@@ -1422,20 +1307,16 @@ export default function DriverStatements() {
                   row.sellId ? invoiceLink({ id: row.sellId }) : "على الحساب",
                   <>
                     {row.driverName}
-                    <p className="text-xs text-muted-foreground">
-                      {row.customerName}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{row.customerName}</p>
                   </>,
-                  row.goodsDirection === "receive"
-                    ? "استلام بضاعة"
-                    : "تسليم بضاعة",
+                  row.goodsDirection === "receive" ? "استلام بضاعة" : "تسليم بضاعة",
                   <>
                     {item.name}
                     <p className="text-xs text-muted-foreground">{item.code}</p>
                   </>,
                   number(item.quantity),
-                  number(item.settlementPriceUSD),
-                  number(item.lineTotalUSD),
+                  number(item.settlementPriceAmount),
+                  number(item.lineTotalAmount),
                 ]),
               )}
             />
@@ -1447,10 +1328,8 @@ export default function DriverStatements() {
                 "السائق",
                 "الحركة",
                 "المبلغ بعملته",
-                "سعر الصرف",
-                "المقابل USD",
                 "نسبة السائق",
-                "العمولة USD",
+                "العمولة ل.س",
                 "ملاحظات",
               ]}
               rows={report.collections
@@ -1468,13 +1347,9 @@ export default function DriverStatements() {
                   </>,
                   row.driverName || "غير محدد",
                   row.isRefund ? "رد نقدي" : "تحصيل",
-                  `${number(row.amountOriginal)} ${row.currency}`,
-                  number(row.exchangeRate),
-                  number(row.amountUSD),
-                  row.commissionRate === null
-                    ? "غير محدد"
-                    : `${row.commissionRate}%`,
-                  number(row.commissionUSD),
+                  `${number(row.amount)} ${row.currency}`,
+                  row.commissionRate === null ? "غير محدد" : `${row.commissionRate}%`,
+                  number(row.commissionAmount),
                   row.note,
                 ])}
             />
@@ -1487,10 +1362,8 @@ export default function DriverStatements() {
                 "السائق",
                 "نوع الحركة",
                 "المبلغ بعملته",
-                "المقابل USD",
-                "رصيد السائق USD",
-                "الدولار الفعلي",
-                "الليرة الفعلية",
+                "رصيد السائق ل.س",
+                "النقد الفعلي ل.س",
                 "ملاحظات",
               ]}
               rows={report.cashMovements.map((row) => [
@@ -1498,10 +1371,8 @@ export default function DriverStatements() {
                 reference(row.referenceId, row.referenceType),
                 row.driverName || report.driver?.username,
                 driverMovementLabel(row.type),
-                `${number(row.amountOriginal)} ${row.currency}`,
-                number(row.amountUSD),
-                number(row.balanceUSD),
-                number(row.balanceByCurrency.USD),
+                `${number(row.amount)} ${row.currency}`,
+                number(row.balance),
                 number(row.balanceByCurrency.SYP),
                 row.note,
               ])}
@@ -1513,20 +1384,20 @@ export default function DriverStatements() {
                 "السند",
                 "السائق",
                 "الحركة",
-                "التحصيل المؤهل USD",
+                "التحصيل المؤهل ل.س",
                 "النسبة المحفوظة",
-                "العمولة / الصرف USD",
-                "المستحق المتبقي USD",
+                "العمولة / الصرف ل.س",
+                "المستحق المتبقي ل.س",
               ]}
               rows={report.commissionRows.map((row) => [
                 dateLabel(row.date),
                 reference(row.referenceId, row.referenceType),
                 row.driverName || report.driver?.username,
                 driverMovementLabel(row.type),
-                number(row.basisUSD),
+                number(row.basisAmount),
                 row.rate === null ? "—" : `${row.rate}%`,
-                number(row.amountUSD),
-                number(row.balanceUSD),
+                number(row.amount),
+                number(row.balance),
               ])}
             />
             <ReportTable
@@ -1539,8 +1410,8 @@ export default function DriverStatements() {
                 "الوارد",
                 "الصادر",
                 "آخر الفترة",
-                "تكلفة الوحدة USD",
-                "قيمة آخر الفترة USD",
+                "تكلفة الوحدة ل.س",
+                "قيمة آخر الفترة ل.س",
               ]}
               rows={report.stockBalances.map((row) => [
                 report.vehicles.find((v) => v.id === row.vehicleId)?.name ||
@@ -1554,8 +1425,8 @@ export default function DriverStatements() {
                 number(row.incomingQuantity),
                 number(row.outgoingQuantity),
                 number(row.closingQuantity),
-                number(row.costUSD),
-                number(row.closingQuantity * row.costUSD),
+                number(row.costAmount),
+                number(row.closingQuantity * row.costAmount),
               ])}
             />
             <ReportTable
@@ -1568,7 +1439,7 @@ export default function DriverStatements() {
                 "السائق",
                 "الصنف / الكود",
                 "الكمية (+ وارد / − صادر)",
-                "تكلفة الوحدة USD",
+                "تكلفة الوحدة ل.س",
                 "الرصيد",
               ]}
               rows={report.stockMovements.map((row) => [
@@ -1583,19 +1454,19 @@ export default function DriverStatements() {
                   <p className="text-xs text-muted-foreground">{row.code}</p>
                 </>,
                 number(row.quantity),
-                number(row.costUSD),
+                number(row.costAmount),
                 number(row.balance),
               ])}
             />
             <ReportTable
               title="المخزون الحالي في السيارات"
-              description={`حتى ${dateLabel(report.currentStock.asOf)} — الكمية ${number(report.currentStock.quantity)} — التكلفة ${money(report.currentStock.costUSD)}`}
+              description={`حتى ${dateLabel(report.currentStock.asOf)} — الكمية ${number(report.currentStock.quantity)} — التكلفة ${money(report.currentStock.costAmount)}`}
               headers={[
                 "السيارة",
                 "الصنف / الكود",
                 "الكمية الحالية",
-                "تكلفة الوحدة USD",
-                "القيمة الحالية USD",
+                "تكلفة الوحدة ل.س",
+                "القيمة الحالية ل.س",
               ]}
               rows={report.currentStock.products.map((row) => [
                 row.warehouse,
@@ -1604,8 +1475,8 @@ export default function DriverStatements() {
                   <p className="text-xs text-muted-foreground">{row.code}</p>
                 </>,
                 number(row.quantity),
-                number(row.costUSD),
-                number(row.quantity * row.costUSD),
+                number(row.costAmount),
+                number(row.quantity * row.costAmount),
               ])}
             />
           </div>

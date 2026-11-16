@@ -11,11 +11,15 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { BoxesIcon } from "lucide-react";
 import { ChartContainer } from "@/components/dashboard/ChartContainer";
 import FilterSelection from "@/components/ui/custom/FilterSelection";
+import { useProductContext } from "@/contexts/ProductContext";
 
 const CategoryDetails = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
-  const products = location.state?.products || [];
+  const { data: allProducts } = useProductContext();
+  const products = allProducts
+    ? allProducts.filter((product) => product.category === id)
+    : location.state?.products || [];
 
   const [openTransfare, setOpenTransfare] = useState(false);
   const [productRow, setProductRow] = useState({});

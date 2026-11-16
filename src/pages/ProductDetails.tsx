@@ -274,6 +274,7 @@ const transfersColumns = [
                       <input
                         type="text"
                         value={value as any}
+                        readOnly={key === "quantity" || key === "reservedQuantity"}
                         onChange={(e) => handleChange(key, e.target.value)}
                         className="w-full min-w-0 border-b-2 border-transparent bg-transparent outline-none transition-all focus:border-primary-500"
                       />

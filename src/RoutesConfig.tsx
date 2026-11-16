@@ -18,22 +18,17 @@ const SignUp = React.lazy(() => import("@/pages/SignUp"));
 const Suppliers = React.lazy(() => import("@/pages/Suppliers"));
 const Customers = React.lazy(() => import("@/pages/Customers"));
 const UnauthorizedPage = React.lazy(() => import("@/pages/Unauthorized"));
-const FinancialStatement = React.lazy(
-  () => import("@/pages/FinancialStatement"),
-);
+const FinancialStatement = React.lazy(() => import("@/pages/FinancialStatement"));
 const CustomerDetails = React.lazy(() => import("@/pages/CustomerDetails"));
 const SupplierDetails = React.lazy(() => import("@/pages/SupplierDetails"));
 const ProductDetails = React.lazy(() => import("@/pages/ProductDetails"));
-const Exchange = React.lazy(() => import("@/pages/Exchange"));
 const Warehouses = React.lazy(() => import("@/pages/Warehouses"));
 const SellDetails = React.lazy(() => import("@/pages/SellDetails"));
 const WarehousesDetails = React.lazy(() => import("@/pages/WarehousesDetails"));
 const Categories = React.lazy(() => import("@/pages/Categories"));
 const CategoryDetails = React.lazy(() => import("@/pages/CategoryDetails"));
 const ChartAccount = React.lazy(() => import("@/pages/ChartAccount"));
-const ChartAccountDetails = React.lazy(
-  () => import("@/pages/ChartAccountDetails"),
-);
+const ChartAccountDetails = React.lazy(() => import("@/pages/ChartAccountDetails"));
 const JournalEntries = React.lazy(() => import("@/pages/JournalEntries"));
 const TrialBalance = React.lazy(() => import("@/pages/TrialBalance"));
 const GeneralLedger = React.lazy(() => import("@/pages/GeneralLedger"));
@@ -42,9 +37,7 @@ const ProfitAnalysis = React.lazy(() => import("@/pages/ProfitAnalysis"));
 const InventoryBalances = React.lazy(() => import("@/pages/InventoryBalances"));
 const Purchases = React.lazy(() => import("@/pages/Purchases"));
 const Users = React.lazy(() => import("@/pages/Users"));
-const MaterialReservations = React.lazy(
-  () => import("@/pages/MaterialReservations"),
-);
+const MaterialReservations = React.lazy(() => import("@/pages/MaterialReservations"));
 //   const AskAi = React.lazy(() => import('@/pages/AskAi'))
 // import AiReports from "@/pages/AiReports";
 
@@ -103,11 +96,7 @@ export const routesConfig = [
   },
   {
     path: "/material-reservations",
-    element: protect(
-      <MaterialReservations />,
-      ["admin"],
-      "material-reservations",
-    ),
+    element: protect(<MaterialReservations />, ["admin"], "material-reservations"),
   },
   {
     path: "/financialStatement",
@@ -129,7 +118,6 @@ export const routesConfig = [
     path: "/sellDetails",
     element: protect(<SellDetails />, ["admin"], "sell-product"),
   },
-  { path: "/Exchange", element: protect(<Exchange />) },
   {
     path: "/warehouses",
     element: protect(<Warehouses />, ["admin"], "warehouses"),

@@ -40,18 +40,14 @@ export interface Sell {
   invoiceNumber?: string;
   sellId?: number | string;
   totalPrice?: number | string;
-  totalUSD?: number | string;
-  totalSYP?: number | string;
-  amount_base?: number | string;
+  amount?: number | string;
   currency?: string;
-  exchangeRate?: number | string;
   paymentStatus?: "cash" | "part" | "debt" | string;
   remainingDebt?: number | string;
   partValue?: number | string;
   paymentAccountId?: string;
   salesAccountId?: string;
 }
-
 export function useSells(): UseQueryResult<Sell[], Error> {
   return useQuery<Sell[], Error>({
     queryKey: queryKeys.sells,

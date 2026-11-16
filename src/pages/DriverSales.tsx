@@ -14,11 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  buildInvoiceMoney,
-  formatExchangeRate,
-  formatMoney as formatCurrencyAmount,
-} from "@/lib/money";
+import { buildInvoiceMoney } from "@/lib/money";
 import getAllCustomer from "@/services/customer";
 import type { Product, ProductPriceType, sell } from "@/services/transaction";
 import {
@@ -31,50 +27,40 @@ import { RefreshCw, Truck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-
 type SelectedProduct = Product & {
   qty: number;
   selectedPriceType?: ProductPriceType;
 };
 type PaymentStatus = "cash" | "part" | "debt";
-
 const toNumber = (value: unknown) => {
   const next = Number(value);
   return Number.isFinite(next) ? next : 0;
 };
-
 const formatNumber = (value: unknown) =>
   toNumber(value).toLocaleString("en-US", { maximumFractionDigits: 3 });
-
 const formatMoney = (value: unknown) =>
   toNumber(value).toLocaleString("en-US", {
     maximumFractionDigits: 2,
     minimumFractionDigits: 0,
   });
-
 const shouldRetryVehicleQuery = (failureCount: number, queryError: Error) => {
   const status = (queryError as VehicleServiceError).status;
   return status !== 401 && status !== 404 && failureCount < 2;
 };
-
 export default function DriverSales() {
   const queryClient = useQueryClient();
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState("");
-  const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>(
-    [],
-  );
+  const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [discount, setDiscount] = useState("");
   const [discountPercent, setDiscountPercent] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("cash");
-  const [currency, setCurrency] = useState("USD");
-  const [exchangeRate, setExchangeRate] = useState(1);
+  const [currency, setCurrency] = useState("SYP");
   const [partValue, setPartValue] = useState("");
   const [salesAccountId, setSalesAccountId] = useState("");
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [receivableAccountId, setReceivableAccountId] = useState("");
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
-
   const {
     data: driverVehicleDashboard,
     isLoading,
@@ -88,76 +74,56 @@ export default function DriverSales() {
       }),
     retry: shouldRetryVehicleQuery,
   });
-
   const { data: customers = [] } = useQuery({
     queryKey: ["customers-table"],
     queryFn: getAllCustomer,
   });
-
   const vehicleSummary = driverVehicleDashboard?.data;
   const vehicleSummaries = driverVehicleDashboard?.vehicles || [];
   const products = vehicleSummary?.products || [];
   const vehicle = vehicleSummary?.vehicle;
-
   useEffect(() => {
     if (!selectedVehicleId && vehicle?.id) {
       setSelectedVehicleId(vehicle.id);
     }
   }, [selectedVehicleId, vehicle?.id]);
-
   useEffect(() => {
     if (!vehicle) return;
-
     setSelectedProducts([]);
     setSalesAccountId(vehicle.defaultSalesAccountId || "");
     setPaymentAccountId(vehicle.defaultPaymentAccountId || "");
     setReceivableAccountId(vehicle.defaultReceivableAccountId || "");
   }, [vehicle?.id]);
-
   const subtotal = useMemo(
     () =>
       selectedProducts.reduce(
-        (sum, product) =>
-          sum + toNumber(product.qty) * toNumber(product.sellPrice),
+        (sum, product) => sum + toNumber(product.qty) * toNumber(product.sellPrice),
         0,
       ),
     [selectedProducts],
   );
-
   const saleMoney = useMemo(
     () =>
       buildInvoiceMoney({
-        subtotalUSD: subtotal,
+        subtotal: subtotal,
         paymentStatus,
         currency,
-        exchangeRate,
         partValue,
-        discountAmountUSD: toNumber(discount),
+        discountAmount: toNumber(discount),
         discountPercent: toNumber(discountPercent),
       }),
-    [
-      currency,
-      discount,
-      discountPercent,
-      exchangeRate,
-      partValue,
-      paymentStatus,
-      subtotal,
-    ],
+    [currency, discount, discountPercent, 1, partValue, paymentStatus, subtotal],
   );
-  const totalPrice = saleMoney.totalUSD;
-
+  const totalPrice = saleMoney.totalPrice;
   const resetInvoice = () => {
     setCustomerId("");
     setSelectedProducts([]);
     setDiscount("");
     setDiscountPercent("");
     setPaymentStatus("cash");
-    setCurrency("USD");
-    setExchangeRate(1);
+    setCurrency("SYP");
     setPartValue("");
   };
-
   const saleMutation = useMutation({
     mutationFn: createMyVehicleSale,
     onSuccess: async () => {
@@ -175,66 +141,51 @@ export default function DriverSales() {
     },
     onError: (saleError) => toast.error((saleError as Error).message),
   });
-
   const validateSale = () => {
     if (!vehicle?.id) {
       toast.error("اختر السيارة");
       return false;
     }
-
     if (!customerId) {
       toast.error("اختر الزبون");
       return false;
     }
-
     if (!selectedProducts.length) {
       toast.error("أضف منتجاً واحداً على الأقل");
       return false;
     }
-
     if (
       selectedProducts.some(
-        (product) =>
-          toNumber(product.qty) <= 0 || toNumber(product.sellPrice) <= 0,
+        (product) => toNumber(product.qty) <= 0 || toNumber(product.sellPrice) <= 0,
       )
     ) {
       toast.error("تأكد من الكميات والأسعار");
       return false;
     }
-
     if (totalPrice <= 0) {
       toast.error("قيمة الفاتورة يجب أن تكون أكبر من صفر");
       return false;
     }
-
     if (toNumber(discountPercent) < 0 || toNumber(discountPercent) > 100) {
       toast.error("نسبة الحسم يجب أن تكون بين 0 و 100");
       return false;
     }
-
     if (toNumber(discount) < 0) {
       toast.error("مبلغ الحسم لا يمكن أن يكون سالبا");
       return false;
     }
-
-    if (saleMoney.discountUSD >= subtotal) {
+    if (saleMoney.discount >= subtotal) {
       toast.error("الحسم يجب أن يكون أقل من مجموع الفاتورة");
       return false;
     }
-
     if (!salesAccountId) {
       toast.error("اختر حساب المبيعات");
       return false;
     }
-
-    if (
-      (paymentStatus === "cash" || paymentStatus === "part") &&
-      !paymentAccountId
-    ) {
+    if ((paymentStatus === "cash" || paymentStatus === "part") && !paymentAccountId) {
       toast.error("اختر حساب القبض");
       return false;
     }
-
     if (
       (paymentStatus === "debt" || paymentStatus === "part") &&
       !receivableAccountId
@@ -243,25 +194,17 @@ export default function DriverSales() {
       return false;
     }
 
-    if (currency !== "USD" && toNumber(exchangeRate) <= 0) {
-      toast.error("أدخل سعر صرف صحيح");
-      return false;
-    }
-
     if (
       paymentStatus === "part" &&
-      (saleMoney.paidUSD <= 0 || saleMoney.paidUSD >= totalPrice)
+      (saleMoney.paidAmount <= 0 || saleMoney.paidAmount >= totalPrice)
     ) {
       toast.error("الدفعة الجزئية يجب أن تكون أكبر من صفر وأقل من الإجمالي");
       return false;
     }
-
     return true;
   };
-
   const submitSale = () => {
     if (!validateSale()) return;
-
     const newSell: sell = {
       customerId,
       products: selectedProducts.map((product) => ({
@@ -274,49 +217,31 @@ export default function DriverSales() {
       })),
       totalPrice,
       paymentStatus,
-      remainingDebt: saleMoney.remainingUSD,
+      remainingDebt: saleMoney.remainingDebt,
       paymentAccountId: paymentStatus === "debt" ? undefined : paymentAccountId,
-      receivableAccountId:
-        paymentStatus === "cash" ? undefined : receivableAccountId,
+      receivableAccountId: paymentStatus === "cash" ? undefined : receivableAccountId,
       salesAccountId,
-      currency: saleMoney.paymentCurrency,
-      paymentCurrency: saleMoney.paymentCurrency,
-      priceCurrency: saleMoney.priceCurrency,
-      exchangeRate: saleMoney.exchangeRate,
-      amount_base: saleMoney.totalOriginal,
-      subtotalUSD: saleMoney.subtotalUSD,
-      totalUSD: saleMoney.totalUSD,
-      totalSYP: saleMoney.totalSYP,
-      totalOriginal: saleMoney.totalOriginal,
-      paidUSD: saleMoney.paidUSD,
-      paidSYP: saleMoney.paidSYP,
-      paidOriginal: saleMoney.paidOriginal,
-      remainingUSD: saleMoney.remainingUSD,
-      remainingSYP: saleMoney.remainingSYP,
-      remainingOriginal: saleMoney.remainingOriginal,
+      currency: saleMoney.currency,
+      amount: saleMoney.totalPrice,
+      subtotal: saleMoney.subtotal,
+      paidAmount: saleMoney.paidAmount,
       discountType: saleMoney.discountType,
       discountPercent: saleMoney.discountPercent,
-      discountPercentUSD: saleMoney.discountPercentUSD,
-      discountAmountUSD: saleMoney.discountAmountUSD,
-      discountUSD: saleMoney.discountUSD,
-      discountSYP: saleMoney.discountSYP,
-      discountOriginal: saleMoney.discountOriginal,
-      partValue: saleMoney.paidOriginal,
-      discount: saleMoney.discountUSD,
+      discountPercentAmount: saleMoney.discountPercentAmount,
+      discountAmount: saleMoney.discountAmount,
+      discount: saleMoney.discount,
+      partValue: saleMoney.paidAmount,
       vehicleId: vehicle?.id,
       vehicleName: vehicle?.name,
       sourceWarehouse: vehicle?.name,
     };
-
     saleMutation.mutate(newSell);
   };
-
   const customerRows = customers.map((customer: any) => ({
     id: customer.id,
     name: customer.name,
     number: customer.number,
   }));
-
   const todaySalesRows = (vehicleSummary?.sales || []).map((sale) => ({
     id: sale.id,
     customerId: sale.customerId,
@@ -324,11 +249,14 @@ export default function DriverSales() {
     totalPrice: formatMoney(sale.totalPrice),
     date: sale.date || "",
   }));
-
   return (
     <DashboardLayout>
       <div className="space-y-4" dir="rtl">
-        <div className="flex justify-end"><Button variant="outline" asChild><Link to="/driver-statements">البيان المالي والتحصيلات والعمولة</Link></Button></div>
+        <div className="flex justify-end">
+          <Button variant="outline" asChild>
+            <Link to="/driver-statements">البيان المالي والتحصيلات والعمولة</Link>
+          </Button>
+        </div>
         <Card>
           <CardHeader className="p-4 sm:p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -344,12 +272,10 @@ export default function DriverSales() {
                       <Badge variant="secondary">{vehicle.plateNumber}</Badge>
                     )}
                     <Badge variant="outline">
-                      الكمية:{" "}
-                      {formatNumber(vehicleSummary?.totals.totalQuantity)}
+                      الكمية: {formatNumber(vehicleSummary?.totals.totalQuantity)}
                     </Badge>
                     <Badge variant="outline">
-                      مبيعات اليوم:{" "}
-                      {formatMoney(vehicleSummary?.totals.salesTotal)}
+                      مبيعات اليوم: {formatMoney(vehicleSummary?.totals.salesTotal)}
                     </Badge>
                   </div>
                 )}
@@ -371,10 +297,7 @@ export default function DriverSales() {
                     </SelectTrigger>
                     <SelectContent>
                       {vehicleSummaries.map((summary) => (
-                        <SelectItem
-                          key={summary.vehicle.id}
-                          value={summary.vehicle.id}
-                        >
+                        <SelectItem key={summary.vehicle.id} value={summary.vehicle.id}>
                           {summary.vehicle.name}
                         </SelectItem>
                       ))}
@@ -399,9 +322,7 @@ export default function DriverSales() {
           </CardHeader>
           <CardContent className="p-3 sm:p-6">
             {isLoading && (
-              <p className="text-muted-foreground">
-                جاري تحميل بيانات السيارة...
-              </p>
+              <p className="text-muted-foreground">جاري تحميل بيانات السيارة...</p>
             )}
             {isError && (
               <p className="text-destructive">
@@ -475,9 +396,7 @@ export default function DriverSales() {
                       <Button
                         key={status}
                         type="button"
-                        variant={
-                          paymentStatus === status ? "default" : "outline"
-                        }
+                        variant={paymentStatus === status ? "default" : "outline"}
                         onClick={() => setPaymentStatus(status)}
                       >
                         {status === "cash"
@@ -502,77 +421,10 @@ export default function DriverSales() {
                   <>
                     <>
                       <div>
-                        <label className="mb-1 block text-sm font-medium">
-                          العملة
-                        </label>
-                        <Select
-                          value={currency}
-                          onValueChange={(nextCurrency) => {
-                            setCurrency(nextCurrency);
-                            setExchangeRate(
-                              nextCurrency === "USD" ? 1 : exchangeRate,
-                            );
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="العملة" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="USD">USD</SelectItem>
-                            <SelectItem value="SYP">SYP</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <label className="mb-1 block text-sm font-medium">العملة</label>
                       </div>
-                      <FormInput
-                        label="سعر الصرف"
-                        type="number"
-                        value={currency === "USD" ? 1 : exchangeRate}
-                        disabled={currency === "USD"}
-                        onChange={(event) =>
-                          setExchangeRate(toNumber(event.target.value))
-                        }
-                      />
                     </>
                   </>
-
-                  <div className="rounded-md border bg-muted/30 p-3 text-sm md:col-span-2">
-                    <div className="grid gap-1 sm:grid-cols-3">
-                      <span>
-                        الإجمالي:{" "}
-                        {formatCurrencyAmount(saleMoney.totalUSD, "USD")}
-                      </span>
-                      <span>
-                        المدفوع:{" "}
-                        {formatCurrencyAmount(saleMoney.paidUSD, "USD")}
-                      </span>
-                      <span>
-                        المتبقي:{" "}
-                        {formatCurrencyAmount(saleMoney.remainingUSD, "USD")}
-                      </span>
-                    </div>
-                    {saleMoney.paymentCurrency === "SYP" && (
-                      <div className="mt-1 grid gap-1 sm:grid-cols-3">
-                        <span>
-                          الإجمالي:{" "}
-                          {formatCurrencyAmount(saleMoney.totalSYP, "SYP")}
-                        </span>
-                        <span>
-                          المدفوع:{" "}
-                          {formatCurrencyAmount(saleMoney.paidSYP, "SYP")}
-                        </span>
-                        <span>
-                          المتبقي:{" "}
-                          {formatCurrencyAmount(saleMoney.remainingSYP, "SYP")}
-                        </span>
-                      </div>
-                    )}
-                    {saleMoney.paymentCurrency === "SYP" && (
-                      <div className="mt-1 text-muted-foreground">
-                        سعر الصرف المعتمد:{" "}
-                        {formatExchangeRate(saleMoney.exchangeRate)}
-                      </div>
-                    )}
-                  </div>
 
                   <AccountSelect
                     label="حساب المبيعات"

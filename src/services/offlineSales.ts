@@ -90,6 +90,11 @@ export const syncPendingOfflineSales = async () => {
 
   for (const record of pendingSales) {
     try {
+      if (record.moneySchema !== "syp-v1") {
+        throw new Error(
+          "هذه الفاتورة محفوظة قبل الانتقال إلى الليرة؛ راجع مبالغها وأدخلها مجدداً قبل الإرسال",
+        );
+      }
       await sellProducts({ newSell: record.sale });
       await removePendingSale(record.id);
       synced += 1;
@@ -105,7 +110,7 @@ export const syncPendingOfflineSales = async () => {
           "تعذر إرسال الفاتورة",
       });
 
-      if (isRetryableSyncError(error)) {
+      if (record.moneySchema === "syp-v1" && isRetryableSyncError(error)) {
         break;
       }
     }

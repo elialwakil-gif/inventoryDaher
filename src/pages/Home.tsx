@@ -1,3 +1,4 @@
+import { formatMoney as formatLira } from "@/lib/money";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -22,104 +23,56 @@ import getAllCustomer from "@/services/customer";
 import getAllPayments from "@/services/payments";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { isSaleOnDate } from "@/lib/salesDates";
-
-function formatCurrency(value: number) {
-  return value.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
 const toNumber = (value: unknown) => {
   const next = Number(value);
   return Number.isFinite(next) ? next : 0;
 };
 
-const formatDualCurrency = (usd: number, syp = 0) => {
-  const usdText = `${formatCurrency(usd)} USD`;
-  return syp ? `${usdText} / ${formatCurrency(syp)} SYP` : usdText;
-};
-
 export default function Home() {
   const navigate = useNavigate();
-
   const { data: products, isLoading: productsLoading } = useProducts();
   const { data: sells, isLoading: sellsLoading } = useSells();
-
   const { data: customers, isLoading: customersLoading } = useQuery({
     queryKey: ["customers-summary"],
     queryFn: getAllCustomer,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });
-
   const { data: payments, isLoading: paymentsLoading } = useQuery({
     queryKey: ["payments-summary"],
     queryFn: getAllPayments,
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });
-
   const loading =
     productsLoading || sellsLoading || customersLoading || paymentsLoading;
-
   const stats = useMemo(() => {
     const productsCount = products?.length ?? 0;
     const salesCount = sells?.length ?? 0;
     const customersCount = customers?.length ?? 0;
-
-    const totalSalesUSD = sells
-      ? sells.reduce(
-          (sum, sell) => sum + toNumber(sell.totalUSD ?? sell.totalPrice),
-          0,
-        )
+    const totalSalesAmount = sells
+      ? sells.reduce((sum, sell) => sum + toNumber(sell.totalPrice), 0)
       : 0;
-    const totalSalesSYP = sells
-      ? sells.reduce((sum, sell) => sum + toNumber(sell.totalSYP), 0)
-      : 0;
-
-    const totalExpensesUSD = payments
+    const totalExpensesAmount = payments
       ? payments
           .filter((payment: any) => payment.type === "expense")
           .reduce(
-            (sum: number, payment: any) =>
-              sum + Math.abs(toNumber(payment.amountUSD ?? payment.amount)),
+            (sum: number, payment: any) => sum + Math.abs(toNumber(payment.amount)),
             0,
           )
       : 0;
-    const totalExpensesSYP = payments
-      ? payments
-          .filter((payment: any) => payment.type === "expense")
-          .reduce(
-            (sum: number, payment: any) =>
-              sum + Math.abs(toNumber(payment.amountSYP)),
-            0,
-          )
-      : 0;
-
-    const totalIncomeUSD = payments
+    const totalIncomeAmount = payments
       ? payments
           .filter((payment: any) => payment.type === "income")
           .reduce(
-            (sum: number, payment: any) =>
-              sum + Math.abs(toNumber(payment.amountUSD ?? payment.amount)),
+            (sum: number, payment: any) => sum + Math.abs(toNumber(payment.amount)),
             0,
           )
       : 0;
-    const totalIncomeSYP = payments
-      ? payments
-          .filter((payment: any) => payment.type === "income")
-          .reduce(
-            (sum: number, payment: any) =>
-              sum + Math.abs(toNumber(payment.amountSYP)),
-            0,
-          )
-      : 0;
-
     return [
       {
         title: "إجمالي المبيعات",
-        value: formatDualCurrency(totalSalesUSD, totalSalesSYP),
+        value: formatLira(totalSalesAmount),
         icon: TrendingUp,
         trendIcon: ArrowUpRight,
         color: "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -127,7 +80,7 @@ export default function Home() {
       },
       {
         title: "إجمالي المصاريف",
-        value: formatDualCurrency(totalExpensesUSD, totalExpensesSYP),
+        value: formatLira(totalExpensesAmount),
         icon: TrendingDown,
         trendIcon: ArrowDownRight,
         color: "bg-rose-50 text-rose-700 border-rose-100",
@@ -135,10 +88,7 @@ export default function Home() {
       },
       {
         title: "صافي الصندوق",
-        value: formatDualCurrency(
-          totalIncomeUSD - totalExpensesUSD,
-          totalIncomeSYP - totalExpensesSYP,
-        ),
+        value: formatLira(totalIncomeAmount - totalExpensesAmount),
         icon: Wallet,
         trendIcon: ArrowUpRight,
         color: "bg-sky-50 text-sky-700 border-sky-100",
@@ -170,7 +120,6 @@ export default function Home() {
       },
     ];
   }, [customers, payments, products, sells]);
-
   const lastOperations = useMemo(() => {
     const paymentOperations = (payments || []).map((payment: any) => ({
       id: payment.id || `${payment.type}-${payment.date}`,
@@ -180,53 +129,38 @@ export default function Home() {
           : payment.type === "income"
             ? "قبض من عميل"
             : "دفعة",
-      amount: Math.abs(toNumber(payment.amountUSD ?? payment.amount)),
-      amountSYP: Math.abs(toNumber(payment.amountSYP)),
+      amount: Math.abs(toNumber(payment.amount)),
       sign: payment.type === "expense" ? -1 : 1,
       date: payment.date || "",
     }));
-
     const sellOperations = (sells || []).map((sell: any) => ({
       id: sell.id ?? `sell-${sell.date}`,
       label: "فاتورة بيع",
-      amount: toNumber(sell.totalUSD ?? sell.totalPrice),
-      amountSYP: toNumber(sell.totalSYP),
+      amount: toNumber(sell.totalPrice),
       sign: 1,
       date: sell.date || "",
     }));
-
     return [...paymentOperations, ...sellOperations]
-      .sort(
-        (a, b) =>
-          new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
-      )
+      .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
       .slice(0, 4);
   }, [payments, sells]);
-
   const todaySalesSummary = useMemo(() => {
     const todaySales = (sells || []).filter((sell) => isSaleOnDate(sell));
-    const totalUSD = todaySales.reduce(
-      (sum, sell) => sum + toNumber(sell.totalUSD ?? sell.totalPrice),
+    const totalAmount = todaySales.reduce(
+      (sum, sell) => sum + toNumber(sell.totalPrice),
       0,
     );
-    const totalSYP = todaySales.reduce(
-      (sum, sell) => sum + toNumber(sell.totalSYP),
-      0,
-    );
-
     return {
       count: todaySales.length,
-      total: formatDualCurrency(totalUSD, totalSYP),
+      total: formatLira(totalAmount),
     };
   }, [sells]);
-
   const quickActions = [
     {
       title: "إضافة فاتورة",
       icon: Receipt,
       path: "/sellProduct",
-      className:
-        "from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600",
+      className: "from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600",
     },
     {
       title: "مبيعات اليوم",
@@ -236,8 +170,7 @@ export default function Home() {
         ? "جاري التحميل..."
         : `${todaySalesSummary.count} فاتورة`,
       amount: sellsLoading ? "" : todaySalesSummary.total,
-      className:
-        "from-cyan-700 to-teal-500 hover:from-cyan-800 hover:to-teal-600",
+      className: "from-cyan-700 to-teal-500 hover:from-cyan-800 hover:to-teal-600",
     },
     {
       title: "إضافة قبض",
@@ -250,18 +183,15 @@ export default function Home() {
       title: "إضافة مصروف",
       icon: Plus,
       path: "/financialStatement",
-      className:
-        "from-rose-600 to-red-500 hover:from-rose-700 hover:to-red-600",
+      className: "from-rose-600 to-red-500 hover:from-rose-700 hover:to-red-600",
     },
     {
       title: "تقرير اليوم",
       icon: BarChart3,
       path: "/dashboard",
-      className:
-        "from-slate-800 to-slate-600 hover:from-slate-900 hover:to-slate-700",
+      className: "from-slate-800 to-slate-600 hover:from-slate-900 hover:to-slate-700",
     },
   ];
-
   return (
     <DashboardLayout>
       <div
@@ -297,7 +227,6 @@ export default function Home() {
           {stats.map((item, index) => {
             const Icon = item.icon;
             const TrendIcon = item.trendIcon;
-
             return (
               <div
                 key={index}
@@ -305,9 +234,7 @@ export default function Home() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium text-slate-500">
-                      {item.title}
-                    </p>
+                    <p className="text-sm font-medium text-slate-500">{item.title}</p>
 
                     {loading ? (
                       <div className="mt-3 h-8 w-28 animate-pulse rounded-xl bg-slate-200" />
@@ -318,9 +245,7 @@ export default function Home() {
                     )}
                   </div>
 
-                  <div
-                    className={`rounded-2xl border p-4 shadow-inner ${item.color}`}
-                  >
+                  <div className={`rounded-2xl border p-4 shadow-inner ${item.color}`}>
                     <Icon size={30} strokeWidth={2.5} />
                   </div>
                 </div>
@@ -340,9 +265,7 @@ export default function Home() {
           <div className="rounded-3xl border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-xl">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-black text-slate-800">
-                  آخر العمليات
-                </h2>
+                <h2 className="text-xl font-black text-slate-800">آخر العمليات</h2>
                 <p className="mt-1 text-sm text-slate-500">
                   أحدث عمليات البيع والقبض والمصاريف
                 </p>
@@ -378,9 +301,7 @@ export default function Home() {
                     className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 transition hover:bg-slate-50 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div>
-                      <div className="font-bold text-slate-800">
-                        {operation.label}
-                      </div>
+                      <div className="font-bold text-slate-800">{operation.label}</div>
                       <div className="mt-1 text-sm text-slate-400">
                         {operation.date || "بدون تاريخ"}
                       </div>
@@ -394,10 +315,7 @@ export default function Home() {
                       }`}
                     >
                       {operation.sign > 0 ? "+" : "-"}
-                      {formatDualCurrency(
-                        operation.amount,
-                        operation.amountSYP,
-                      )}
+                      {formatLira(operation.amount)}
                     </span>
                   </div>
                 ))
@@ -408,9 +326,7 @@ export default function Home() {
           <div className="rounded-3xl border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-xl">
             <div className="mb-5 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-black text-slate-800">
-                  اختصارات سريعة
-                </h2>
+                <h2 className="text-xl font-black text-slate-800">اختصارات سريعة</h2>
                 <p className="mt-1 text-sm text-slate-500">
                   نفّذ العمليات الأساسية بسرعة
                 </p>
@@ -424,7 +340,6 @@ export default function Home() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {quickActions.map((action) => {
                 const Icon = action.icon;
-
                 return (
                   <button
                     key={action.title}
@@ -457,8 +372,8 @@ export default function Home() {
             <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
               <h3 className="font-bold text-slate-700">ملاحظة</h3>
               <p className="mt-1 text-sm leading-6 text-slate-500">
-                جميع الأرقام يتم حسابها من بيانات المنتجات، المبيعات، العملاء
-                والدفعات الموجودة في النظام.
+                جميع الأرقام يتم حسابها من بيانات المنتجات، المبيعات، العملاء والدفعات
+                الموجودة في النظام.
               </p>
             </div>
           </div>

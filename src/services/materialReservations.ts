@@ -1,7 +1,5 @@
 import apiClient from "@/lib/axios";
-
 export type MaterialReservationStatus = "reserved" | "closed" | "cancelled";
-
 export interface MaterialReservationItem {
   id: string;
   productId: string;
@@ -19,7 +17,6 @@ export interface MaterialReservationItem {
   returnedQty?: number;
   lineTotal?: number;
 }
-
 export interface MaterialReservation {
   id: string;
   customerId: string;
@@ -36,14 +33,13 @@ export interface MaterialReservation {
   totalPrice?: number;
   discount?: number;
   discountPercent?: number;
-  discountPercentUSD?: number;
-  discountAmountUSD?: number;
+  discountPercentAmount?: number;
+  discountAmount?: number;
   createdAt: string;
   updatedAt: string;
   closedAt?: string;
   cancelledAt?: string;
 }
-
 export interface CreateMaterialReservationPayload {
   customerId: string;
   technicianId?: string;
@@ -56,7 +52,6 @@ export interface CreateMaterialReservationPayload {
     sellPrice?: number;
   }>;
 }
-
 export interface CloseMaterialReservationPayload {
   items: Array<{
     productId: string;
@@ -67,27 +62,23 @@ export interface CloseMaterialReservationPayload {
     paymentStatus: "cash" | "part" | "debt";
     discount?: number;
     discountPercent?: number;
-    discountPercentUSD?: number;
-    discountAmountUSD?: number;
+    discountPercentAmount?: number;
+    discountAmount?: number;
     currency: string;
-    exchangeRate: number;
     partValue?: number;
     paymentAccountId?: string;
     receivableAccountId?: string;
     salesAccountId?: string;
   };
 }
-
 const normalizeReservationsResponse = (data: any): MaterialReservation[] => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.reservations)) return data.reservations;
   return [];
 };
-
 const getErrorMessage = (error: any, fallback: string) =>
   error?.response?.data?.message || error?.message || fallback;
-
 export async function getAllMaterialReservations() {
   try {
     const response = await apiClient.get("/api/material-reservations");
@@ -96,7 +87,6 @@ export async function getAllMaterialReservations() {
     throw new Error(getErrorMessage(error, "Failed to fetch reservations"));
   }
 }
-
 export async function createMaterialReservation(
   payload: CreateMaterialReservationPayload,
 ) {
@@ -107,7 +97,6 @@ export async function createMaterialReservation(
     throw new Error(getErrorMessage(error, "Failed to create reservation"));
   }
 }
-
 export async function closeMaterialReservation(
   id: string,
   payload: CloseMaterialReservationPayload,
@@ -122,12 +111,9 @@ export async function closeMaterialReservation(
     throw new Error(getErrorMessage(error, "Failed to close reservation"));
   }
 }
-
 export async function cancelMaterialReservation(id: string) {
   try {
-    const response = await apiClient.post(
-      `/api/material-reservations/${id}/cancel`,
-    );
+    const response = await apiClient.post(`/api/material-reservations/${id}/cancel`);
     return response.data;
   } catch (error: any) {
     throw new Error(getErrorMessage(error, "Failed to cancel reservation"));

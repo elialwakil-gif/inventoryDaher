@@ -1,6 +1,5 @@
 import { Text, View, StyleSheet } from "@react-pdf/renderer";
-import { formatExchangeRate, shouldShowExchangeRate } from "@/lib/money";
-
+import {} from "@/lib/money";
 export default function InvoicePdf({ sell }: { sell: any }) {
   const toNumber = (value: unknown, fallback = 0) => {
     const numberValue = Number(value);
@@ -13,25 +12,20 @@ export default function InvoicePdf({ sell }: { sell: any }) {
         0,
       )
     : 0;
-  const productsTotal = toNumber(sell?.subtotalUSD, productsSubtotal) || productsSubtotal;
-  const savedDiscount = toNumber(sell?.discountUSD ?? sell?.discount);
-  const inferredDiscount = Math.max(
-    productsTotal - toNumber(sell?.totalPrice),
-    0,
-  );
+  const productsTotal = toNumber(sell?.subtotal, productsSubtotal) || productsSubtotal;
+  const savedDiscount = toNumber(sell?.discount);
+  const inferredDiscount = Math.max(productsTotal - toNumber(sell?.totalPrice), 0);
   const discount = savedDiscount > 0 ? savedDiscount : inferredDiscount;
   const discountPercent = toNumber(sell?.discountPercent);
-  const discountAmountUSD = toNumber(sell?.discountAmountUSD);
+  const fixedDiscountAmount = toNumber(sell?.discountAmount);
   const discountDetails = [
     discountPercent > 0 ? `${discountPercent.toFixed(2)}%` : "",
-    discountAmountUSD > 0 ? `${discountAmountUSD.toFixed(2)}` : "",
+    fixedDiscountAmount > 0 ? `${fixedDiscountAmount.toFixed(2)}` : "",
   ]
     .filter(Boolean)
     .join(" + ");
   const totalPrice = toNumber(sell?.totalPrice);
-  const invoiceCurrency = sell?.paymentCurrency || sell?.currency || "USD";
-  const showExchangeRate = shouldShowExchangeRate({ currency: invoiceCurrency });
-
+  const invoiceCurrency = sell?.currency || "SYP";
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -55,14 +49,7 @@ export default function InvoicePdf({ sell }: { sell: any }) {
           <Text style={styles.ltr}>{invoiceCurrency}</Text>
         </View>
 
-        {showExchangeRate && (
-          <View style={styles.infoRow}>
-            <Text>:سعر الصرف</Text>
-            <Text style={styles.ltr}>
-              {formatExchangeRate(sell?.exchangeRate)}
-            </Text>
-          </View>
-        )}
+        {1 && null}
 
         <View style={styles.infoRow}>
           <Text>:رقم الفاتورة</Text>
@@ -85,9 +72,7 @@ export default function InvoicePdf({ sell }: { sell: any }) {
             <Text style={styles.cell}>{p.name}</Text>
 
             <View style={styles.cellRow}>
-              <Text style={styles.ltr}>
-                {p?.sellPrice?.toFixed(2) || "0.00"}
-              </Text>
+              <Text style={styles.ltr}>{p?.sellPrice?.toFixed(2) || "0.00"}</Text>
               <Text> × </Text>
               <Text style={styles.ltr}>{p.qty}</Text>
             </View>
@@ -104,12 +89,12 @@ export default function InvoicePdf({ sell }: { sell: any }) {
         <>
           <View style={styles.totalContainer}>
             <Text style={styles.totalLabel}>المجموع قبل الحسم:</Text>
-            <Text style={styles.totalAmount}>{productsTotal.toFixed(2)}</Text>
+            <Text style={styles.totalPrice}>{productsTotal.toFixed(2)}</Text>
           </View>
 
           <View style={styles.totalContainer}>
             <Text style={styles.totalLabel}>الحسم:</Text>
-            <Text style={styles.totalAmount}>
+            <Text style={styles.totalPrice}>
               {discount.toFixed(2)}
               {discountDetails ? ` (${discountDetails})` : ""}
             </Text>
@@ -120,7 +105,7 @@ export default function InvoicePdf({ sell }: { sell: any }) {
       {/* Total */}
       <View style={styles.totalContainer}>
         <Text style={styles.totalLabel}>المجموع:</Text>
-        <Text style={styles.totalAmount}>{totalPrice.toFixed(2)}</Text>
+        <Text style={styles.totalPrice}>{totalPrice.toFixed(2)}</Text>
       </View>
 
       {/* Footer */}
@@ -128,7 +113,6 @@ export default function InvoicePdf({ sell }: { sell: any }) {
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     fontFamily: "Amiri",
@@ -137,7 +121,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     direction: "rtl",
   },
-
   header: {
     fontSize: 28,
     fontWeight: "bold",
@@ -204,7 +187,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginRight: 8,
   },
-  totalAmount: {
+  totalPrice: {
     fontSize: 14,
     fontWeight: "bold",
     color: "#000",
@@ -221,11 +204,9 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: 4,
   },
-
   ltr: {
     direction: "ltr",
   },
-
   cellRow: {
     flexDirection: "row-reverse",
     width: "33%",

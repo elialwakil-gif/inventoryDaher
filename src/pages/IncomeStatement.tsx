@@ -5,18 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Loading from "@/components/ui/custom/Loading";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useGetAccount } from "@/hooks/useAccount";
 import { useJournalEntries } from "@/hooks/useJournalEntries";
 import getAllSells from "@/services/sells";
@@ -33,7 +22,6 @@ import {
 import { useMemo, useState } from "react";
 import { DateRange } from "react-day-picker";
 import { useNavigate } from "react-router-dom";
-
 const statementColumns = [
   { key: "id", label: "المعرف", hidden: true },
   { key: "code", label: "رمز الحساب", sortable: true },
@@ -44,7 +32,6 @@ const statementColumns = [
   { key: "credit", label: "دائن", sortable: true },
   { key: "netAmount", label: "صافي الفترة", sortable: true },
 ];
-
 const normalizeAccounts = (data: any) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.accounts)) return data.accounts;
@@ -52,7 +39,6 @@ const normalizeAccounts = (data: any) => {
   if (Array.isArray(data?.data?.accounts)) return data.data.accounts;
   return [];
 };
-
 const normalizeEntries = (data: any) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
@@ -60,7 +46,6 @@ const normalizeEntries = (data: any) => {
   if (Array.isArray(data?.journalEntries)) return data.journalEntries;
   return [];
 };
-
 const normalizeSells = (data: any) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.sells)) return data.sells;
@@ -68,24 +53,13 @@ const normalizeSells = (data: any) => {
   if (Array.isArray(data?.data?.sells)) return data.data.sells;
   return [];
 };
-
 const formatNumber = (value: number) =>
   value.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-
 const getDayStart = (date: Date) =>
-  new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    0,
-    0,
-    0,
-    0,
-  ).getTime();
-
+  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0).getTime();
 const getDayEnd = (date: Date) =>
   new Date(
     date.getFullYear(),
@@ -96,10 +70,9 @@ const getDayEnd = (date: Date) =>
     59,
     999,
   ).getTime();
-
 export default function IncomeStatement() {
   const navigate = useNavigate();
-  const [currencyFilter, setCurrencyFilter] = useState("all");
+  const [currencyFilter] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const { data: accountsData, isLoading: accountsLoading } = useGetAccount();
   const { data: entriesData, isLoading: entriesLoading } = useJournalEntries();
@@ -109,76 +82,53 @@ export default function IncomeStatement() {
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });
-
   const accounts = useMemo(() => normalizeAccounts(accountsData), [accountsData]);
-  const journalEntries = useMemo(
-    () => normalizeEntries(entriesData),
-    [entriesData],
-  );
+  const journalEntries = useMemo(() => normalizeEntries(entriesData), [entriesData]);
   const sells = useMemo(() => normalizeSells(sellsData), [sellsData]);
-
-  const allCurrencies = useMemo(() => {
-    const accountCurrencies = accounts
-      .map((account: any) => String(account.currency || "").toUpperCase())
-      .filter(Boolean);
-    const sellCurrencies = sells
-      .map((sell: any) => String(sell.currency || "").toUpperCase())
-      .filter(Boolean);
-
-    return Array.from(new Set([...accountCurrencies, ...sellCurrencies]));
-  }, [accounts, sells]);
-
   const filteredEntries = useMemo(() => {
     const fromTime = dateRange?.from
       ? getDayStart(dateRange.from)
       : Number.NEGATIVE_INFINITY;
-    const toTime = dateRange?.to
-      ? getDayEnd(dateRange.to)
-      : Number.POSITIVE_INFINITY;
-
+    const toTime = dateRange?.to ? getDayEnd(dateRange.to) : Number.POSITIVE_INFINITY;
     return journalEntries.filter((entry: any) => {
       const entryTime = parseDate(entry.date);
       return entryTime >= fromTime && entryTime <= toTime;
     });
   }, [dateRange, journalEntries]);
-
   const filteredSells = useMemo(() => {
     const fromTime = dateRange?.from
       ? getDayStart(dateRange.from)
       : Number.NEGATIVE_INFINITY;
-    const toTime = dateRange?.to
-      ? getDayEnd(dateRange.to)
-      : Number.POSITIVE_INFINITY;
-
+    const toTime = dateRange?.to ? getDayEnd(dateRange.to) : Number.POSITIVE_INFINITY;
     return sells.filter((sell: any) => {
       const sellTime = parseDate(sell.date);
       return sellTime >= fromTime && sellTime <= toTime;
     });
   }, [dateRange, sells]);
-
   const accountMovements = useMemo(() => {
-    const movementByAccount = new Map<string, { debit: number; credit: number }>();
-
+    const movementByAccount = new Map<
+      string,
+      {
+        debit: number;
+        credit: number;
+      }
+    >();
     filteredEntries.forEach((entry: any) => {
       (entry.lines || []).forEach((line: any) => {
         const accountId = String(line.accountId || "");
         if (!accountId) return;
-
         const previous = movementByAccount.get(accountId) || {
           debit: 0,
           credit: 0,
         };
-
         movementByAccount.set(accountId, {
           debit: previous.debit + Number(line.debit || 0),
           credit: previous.credit + Number(line.credit || 0),
         });
       });
     });
-
     return movementByAccount;
   }, [filteredEntries]);
-
   const cogsAccountIds = useMemo(
     () =>
       new Set(
@@ -191,62 +141,47 @@ export default function IncomeStatement() {
       ),
     [accounts],
   );
-
   const journalCogsByCurrency = useMemo(() => {
     const totals = new Map<string, number>();
-
     accounts.forEach((account: any) => {
       if (!cogsAccountIds.has(String(account.id))) return;
-
       const movement = accountMovements.get(String(account.id)) || {
         debit: 0,
         credit: 0,
       };
       const amount = movement.debit - movement.credit;
       const currency = String(account.currency || "غير محددة").toUpperCase();
-
       totals.set(currency, (totals.get(currency) || 0) + amount);
     });
-
     return totals;
   }, [accountMovements, accounts, cogsAccountIds]);
-
   const derivedCogsByCurrency = useMemo(() => {
     const totals = new Map<string, number>();
-
     filteredSells.forEach((sell: any) => {
-      const currency = String(sell.priceCurrency || "USD").toUpperCase();
+      const currency = String(sell.currency || "SYP").toUpperCase();
       const totalCost = (sell.products || []).reduce(
         (sum: number, product: any) =>
           sum + Number(product.qty || 0) * Number(product.payPrice || 0),
         0,
       );
-
       if (!totalCost) return;
-
       totals.set(currency, (totals.get(currency) || 0) + totalCost);
     });
-
     return totals;
   }, [filteredSells]);
-
   const derivedCogsRows = useMemo(() => {
     const rows: any[] = [];
-
     derivedCogsByCurrency.forEach((amount, currency) => {
       const journalAmount = Number(journalCogsByCurrency.get(currency) || 0);
-
       if (amount <= 0 || Math.abs(journalAmount) > 0.0001) {
         return;
       }
-
       const cogsAccount = accounts.find(
         (account: any) =>
           account.type === "Expense" &&
           account.category === "CostOfGoodsSold" &&
           String(account.currency || "غير محددة").toUpperCase() === currency,
       );
-
       rows.push({
         id: `derived-cogs-${currency}`,
         code: cogsAccount?.code || "AUTO-COGS",
@@ -261,10 +196,8 @@ export default function IncomeStatement() {
         isDerivedFromSales: true,
       });
     });
-
     return rows;
   }, [accounts, derivedCogsByCurrency, journalCogsByCurrency]);
-
   const statementRows = useMemo(() => {
     const accountRows = accounts
       .filter(
@@ -279,7 +212,6 @@ export default function IncomeStatement() {
           account.type === "Revenue"
             ? movement.credit - movement.debit
             : movement.debit - movement.credit;
-
         return {
           id: account.id,
           code: account.code || "-",
@@ -294,15 +226,12 @@ export default function IncomeStatement() {
           isDerivedFromSales: false,
         };
       });
-
     return [...accountRows, ...derivedCogsRows];
   }, [accountMovements, accounts, derivedCogsRows]);
-
   const filteredRows = useMemo(() => {
     if (currencyFilter === "all") return statementRows;
     return statementRows.filter((row) => row.currency === currencyFilter);
   }, [currencyFilter, statementRows]);
-
   const revenueRows = filteredRows.filter((row) => row.type === "Revenue");
   const expenseRows = filteredRows.filter((row) => row.type === "Expense");
   const totalCostOfGoodsSold = expenseRows
@@ -320,7 +249,6 @@ export default function IncomeStatement() {
   const grossProfit = totalRevenue - totalCostOfGoodsSold;
   const netIncome = grossProfit - operatingExpenses;
   const isLoading = accountsLoading || entriesLoading || sellsLoading;
-
   return (
     <DashboardLayout>
       <div className="space-y-6" dir="rtl">
@@ -335,7 +263,10 @@ export default function IncomeStatement() {
           <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start font-normal sm:w-auto">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start font-normal sm:w-auto"
+                >
                   <CalendarIcon className="ml-2 h-4 w-4" />
                   {dateRange?.from ? (
                     dateRange.to ? (
@@ -370,21 +301,7 @@ export default function IncomeStatement() {
               مسح الفلتر
             </Button>
 
-            <div className="w-full sm:w-56">
-              <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="تصفية حسب العملة" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">كل العملات</SelectItem>
-                  {allCurrencies.map((currency) => (
-                    <SelectItem key={currency} value={currency}>
-                      {currency}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <div className="w-full sm:w-56"></div>
           </div>
         </div>
 
@@ -430,9 +347,7 @@ export default function IncomeStatement() {
                 <CardContent className="pt-6">
                   <div className="text-sm text-muted-foreground">مجمل الربح</div>
                   <div
-                    className={`mt-2 text-3xl font-bold ${
-                      grossProfit >= 0 ? "text-green-600" : "text-destructive"
-                    }`}
+                    className={`mt-2 text-3xl font-bold ${grossProfit >= 0 ? "text-green-600" : "text-destructive"}`}
                   >
                     {grossProfit >= 0 ? "ربح " : "خسارة "}
                     {formatNumber(Math.abs(grossProfit))}
@@ -446,9 +361,7 @@ export default function IncomeStatement() {
                     صافي الربح / الخسارة
                   </div>
                   <div
-                    className={`mt-2 text-3xl font-bold ${
-                      netIncome >= 0 ? "text-green-600" : "text-destructive"
-                    }`}
+                    className={`mt-2 text-3xl font-bold ${netIncome >= 0 ? "text-green-600" : "text-destructive"}`}
                   >
                     {netIncome >= 0 ? "ربح " : "خسارة "}
                     {formatNumber(Math.abs(netIncome))}

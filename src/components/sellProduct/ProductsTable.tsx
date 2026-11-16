@@ -27,10 +27,10 @@ const priceTypeOptions: Array<{
   value: StandardProductPriceType;
   label: string;
 }> = [
-  { value: "sellPrice", label: "سعر المبيع" },
-  { value: "wholesalePrice", label: "سعر الجملة" },
-  { value: "superWholesalePrice", label: "سعر جملة الجملة" },
-  { value: "payPrice", label: "سعر الشراء" },
+  { value: "sellPrice", label: "سعر المبيع (ل.س)" },
+  { value: "wholesalePrice", label: "سعر الجملة (ل.س)" },
+  { value: "superWholesalePrice", label: "سعر جملة الجملة (ل.س)" },
+  { value: "payPrice", label: "سعر الشراء (ل.س)" },
 ];
 
 const toNumber = (value: unknown, fallback = 0) => {
@@ -38,20 +38,14 @@ const toNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(numberValue) ? numberValue : fallback;
 };
 
-const getProductPrice = (
-  product: Partial<Product>,
-  priceType: ProductPriceType,
-) => {
+const getProductPrice = (product: Partial<Product>, priceType: ProductPriceType) => {
   if (priceType === "custom") return toNumber(product.sellPrice);
 
   return toNumber(product[priceType], toNumber(product.sellPrice));
 };
 
 const getAvailableQuantity = (product?: Product) =>
-  Math.max(
-    toNumber(product?.quantity) - toNumber(product?.reservedQuantity),
-    0,
-  );
+  Math.max(toNumber(product?.quantity) - toNumber(product?.reservedQuantity), 0);
 
 interface ProductsTableProps {
   products: Product[];
@@ -83,9 +77,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
   const selectedProductsRef = useRef<SelectedProduct[]>(selectedProducts);
   const allowedPriceTypeKey = allowedPriceTypes.join("|");
   const availablePriceTypeOptions = useMemo(() => {
-    const allowedTypes = allowedPriceTypes.length
-      ? allowedPriceTypes
-      : ["sellPrice"];
+    const allowedTypes = allowedPriceTypes.length ? allowedPriceTypes : ["sellPrice"];
     const allowedTypeSet = new Set(allowedTypes);
 
     return priceTypeOptions.filter((option) => allowedTypeSet.has(option.value));
@@ -98,19 +90,13 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
   )
     ? defaultPriceType
     : primaryPriceType;
-  const canChoosePriceType =
-    availablePriceTypeOptions.length > 1 || allowCustomPrice;
+  const canChoosePriceType = availablePriceTypeOptions.length > 1 || allowCustomPrice;
   const isSelectablePriceType = (priceType: ProductPriceType) =>
     priceType === "custom"
       ? allowCustomPrice
       : availablePriceTypeOptions.some((option) => option.value === priceType);
-  const getSelectedPriceTypeValue = (
-    product: SelectedProduct,
-  ): ProductPriceType => {
-    if (
-      product.selectedPriceType &&
-      isSelectablePriceType(product.selectedPriceType)
-    ) {
+  const getSelectedPriceTypeValue = (product: SelectedProduct): ProductPriceType => {
+    if (product.selectedPriceType && isSelectablePriceType(product.selectedPriceType)) {
       return product.selectedPriceType;
     }
 
@@ -162,9 +148,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
 
   const updateQty = (id: string, qty: number) => {
     const nextQty = toNumber(qty);
-    const availableQuantity = getAvailableQuantity(
-      products.find((p) => p.id === id),
-    );
+    const availableQuantity = getAvailableQuantity(products.find((p) => p.id === id));
 
     if (nextQty <= 0) {
       toast.error("الكمية يجب أن تكون أكبر من صفر");
@@ -329,10 +313,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
           onChange={(e) => setSearch(e.target.value)}
           className="h-11"
         />
-        <QrScannerButton
-          onScan={handleQrScan}
-          className="h-11 w-full sm:w-auto"
-        />
+        <QrScannerButton onScan={handleQrScan} className="h-11 w-full sm:w-auto" />
       </div>
 
       {search && filteredProducts.length > 0 && (
@@ -449,9 +430,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                 <tr>
                   <th className="border p-2">المنتج</th>
                   <th className="border p-2">الكود</th>
-                  {canChoosePriceType && (
-                    <th className="border p-2">نوع السعر</th>
-                  )}
+                  {canChoosePriceType && <th className="border p-2">نوع السعر</th>}
                   <th className="border p-2">
                     {canChoosePriceType ? "السعر" : primaryPriceTypeLabel}
                   </th>
@@ -508,9 +487,7 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
                         className="w-24"
                       />
                     </td>
-                    <td className="border p-2">
-                      ${(p.sellPrice * p.qty).toFixed(2)}
-                    </td>
+                    <td className="border p-2">${(p.sellPrice * p.qty).toFixed(2)}</td>
                     <td className="border p-2 text-center">
                       <Button
                         type="button"

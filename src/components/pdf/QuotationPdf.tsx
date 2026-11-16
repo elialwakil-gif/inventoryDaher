@@ -1,34 +1,24 @@
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { Quotation } from "@/services/quotations";
-import { formatExchangeRate, shouldShowExchangeRate } from "@/lib/money";
-
+import {} from "@/lib/money";
 const toNumber = (value: unknown, fallback = 0) => {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : fallback;
 };
-
 const formatAmount = (value: unknown) => toNumber(value).toFixed(2);
-
-export default function QuotationPdf({
-  quotation,
-}: {
-  quotation: Partial<Quotation>;
-}) {
-  const products = Array.isArray(quotation.products)
-    ? quotation.products
-    : [];
+export default function QuotationPdf({ quotation }: { quotation: Partial<Quotation> }) {
+  const products = Array.isArray(quotation.products) ? quotation.products : [];
   const productsSubtotal = products.reduce(
-    (sum, product) =>
-      sum + toNumber(product?.qty) * toNumber(product?.sellPrice),
+    (sum, product) => sum + toNumber(product?.qty) * toNumber(product?.sellPrice),
     0,
   );
   const subtotal = toNumber(quotation.subtotal, productsSubtotal) || productsSubtotal;
   const discount = toNumber(quotation.discount);
   const discountPercent = toNumber(quotation.discountPercent);
-  const discountAmountUSD = toNumber(quotation.discountAmountUSD);
+  const fixedDiscountAmount = toNumber(quotation.discountAmount);
   const discountDetails = [
     discountPercent > 0 ? `${discountPercent.toFixed(2)}%` : "",
-    discountAmountUSD > 0 ? `${discountAmountUSD.toFixed(2)}` : "",
+    fixedDiscountAmount > 0 ? `${fixedDiscountAmount.toFixed(2)}` : "",
   ]
     .filter(Boolean)
     .join(" + ");
@@ -36,11 +26,7 @@ export default function QuotationPdf({
     quotation.totalPrice === undefined
       ? Math.max(subtotal - discount, 0)
       : toNumber(quotation.totalPrice);
-  const quotationCurrency = quotation.currency || "USD";
-  const showExchangeRate = shouldShowExchangeRate({
-    currency: quotationCurrency,
-  });
-
+  const quotationCurrency = quotation.currency || "SYP";
   return (
     <View style={styles.container}>
       <Text style={styles.brand}>Daher-Net</Text>
@@ -72,14 +58,7 @@ export default function QuotationPdf({
           <Text>العملة:</Text>
           <Text style={styles.ltr}>{quotationCurrency}</Text>
         </View>
-        {showExchangeRate && (
-          <View style={styles.infoRow}>
-            <Text>سعر الصرف:</Text>
-            <Text style={styles.ltr}>
-              {formatExchangeRate(quotation.exchangeRate)}
-            </Text>
-          </View>
-        )}
+        {1 && null}
       </View>
 
       <View style={styles.table}>
@@ -106,13 +85,13 @@ export default function QuotationPdf({
 
       <View style={styles.totalContainer}>
         <Text style={styles.totalLabel}>المجموع قبل الحسم:</Text>
-        <Text style={styles.totalAmount}>{formatAmount(subtotal)}</Text>
+        <Text style={styles.totalPrice}>{formatAmount(subtotal)}</Text>
       </View>
 
       {discount > 0 && (
         <View style={styles.totalContainer}>
           <Text style={styles.totalLabel}>الحسم:</Text>
-          <Text style={styles.totalAmount}>
+          <Text style={styles.totalPrice}>
             {formatAmount(discount)}
             {discountDetails ? ` (${discountDetails})` : ""}
           </Text>
@@ -121,7 +100,7 @@ export default function QuotationPdf({
 
       <View style={[styles.totalContainer, styles.finalTotal]}>
         <Text style={styles.totalLabel}>المجموع النهائي:</Text>
-        <Text style={styles.totalAmount}>{formatAmount(totalPrice)}</Text>
+        <Text style={styles.totalPrice}>{formatAmount(totalPrice)}</Text>
       </View>
 
       {quotation.note && (
@@ -133,7 +112,6 @@ export default function QuotationPdf({
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     fontFamily: "Amiri",
@@ -221,7 +199,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginRight: 8,
   },
-  totalAmount: {
+  totalPrice: {
     fontSize: 14,
     fontWeight: "bold",
   },

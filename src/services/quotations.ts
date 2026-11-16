@@ -1,19 +1,11 @@
 import apiClient from "@/lib/axios";
 import type { Product, ProductPriceType } from "@/services/transaction";
-
-export type QuotationStatus =
-  | "draft"
-  | "sent"
-  | "accepted"
-  | "rejected"
-  | "converted";
-
+export type QuotationStatus = "draft" | "sent" | "accepted" | "rejected" | "converted";
 export type QuotationProduct = Product & {
   productId?: string;
   qty: number;
   selectedPriceType?: ProductPriceType;
 };
-
 export interface Quotation {
   id?: string;
   number: string;
@@ -25,11 +17,10 @@ export interface Quotation {
   discount: number;
   discountType?: "none" | "amount" | "percent" | "mixed";
   discountPercent?: number;
-  discountPercentUSD?: number;
-  discountAmountUSD?: number;
+  discountPercentAmount?: number;
+  discountAmount?: number;
   totalPrice: number;
   currency: string;
-  exchangeRate: number;
   status: QuotationStatus;
   validUntil?: string;
   note?: string;
@@ -38,7 +29,6 @@ export interface Quotation {
   createdAt?: string;
   updatedAt?: string;
 }
-
 export type QuotationInput = Omit<
   Quotation,
   "id" | "number" | "subtotal" | "totalPrice" | "date" | "createdAt" | "updatedAt"
@@ -47,7 +37,6 @@ export type QuotationInput = Omit<
   subtotal?: number;
   totalPrice?: number;
 };
-
 export const quotationStatusLabels: Record<QuotationStatus, string> = {
   draft: "مسودة",
   sent: "مرسل",
@@ -55,27 +44,22 @@ export const quotationStatusLabels: Record<QuotationStatus, string> = {
   rejected: "مرفوض",
   converted: "محول إلى فاتورة",
 };
-
 export async function getAllQuotations() {
   const response = await apiClient.get("/api/quotations");
   return response.data as Quotation[];
 }
-
 export async function createQuotation(data: QuotationInput) {
   const response = await apiClient.post("/api/quotations", data);
   return response.data as Quotation;
 }
-
 export async function updateQuotation(id: string, data: Partial<QuotationInput>) {
   const response = await apiClient.put(`/api/quotations/${id}`, data);
   return response.data as Quotation;
 }
-
 export async function deleteQuotation(id: string) {
   const response = await apiClient.delete(`/api/quotations/${id}`);
   return response.data;
 }
-
 export async function markQuotationConverted(id: string, sellId?: string) {
   const response = await apiClient.post(`/api/quotations/${id}/converted`, {
     sellId,

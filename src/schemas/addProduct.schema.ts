@@ -1,6 +1,5 @@
 // schemas/addProduct.schema.ts
 import { z } from "zod";
-
 export const addProductSchema = z.object({
   name: z.string().min(1, "اسم المنتج مطلوب"),
   code: z.string().min(1, "رمز المنتج مطلوب"),
@@ -14,11 +13,10 @@ export const addProductSchema = z.object({
   alertQuantity: z.coerce.number().min(0).default(5),
   unit: z.string().min(1),
   supplierId: z.string().min(1, "المورد مطلوب"),
-inventoryAccountId: z.string().min(1, "حساب المخزون مطلوب"),
-payableAccountId: z.string().min(1, "حساب الموردين مطلوب"),
-paymentAccountId: z.string().optional(),
+  inventoryAccountId: z.string().min(1, "حساب المخزون مطلوب"),
+  payableAccountId: z.string().min(1, "حساب الموردين مطلوب"),
+  paymentAccountId: z.string().optional(),
   isDebt: z.enum(["cash", "part", "debt"]),
   partValue: z.coerce.number().optional(),
-  currency: z.enum(["USD", "SYP"]).optional(),
-  exchangeRate: z.coerce.number().default(1),
+  currency: z.enum(["SYP"]).optional(),
 });

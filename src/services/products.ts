@@ -9,6 +9,28 @@ export default async function getAllProducts() {
   return getProducts({ pricing: "full" });
 }
 
+export type CatalogProductInput = {
+  name: string;
+  code: string;
+  category: string;
+  warehouse: string;
+  unit: string;
+  payPrice: number;
+  wholesalePrice: number;
+  superWholesalePrice: number;
+  sellPrice: number;
+  alertQuantity: number;
+};
+
+export async function addCatalogProduct(product: CatalogProductInput) {
+  try {
+    const response = await apiClient.post("/api/products/catalog", product);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error?.response?.data?.message || "تعذر إضافة المنتج إلى القائمة");
+  }
+}
+
 export async function getProducts({
   pricing = "full",
 }: {

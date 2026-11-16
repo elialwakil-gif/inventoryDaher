@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { driverStatementExportSheets } from "./driverStatementExport";
 import type { DriverStatement } from "@/types/driverFinance";
-
 describe("driver statement export", () => {
   const report: DriverStatement = {
     driver: { id: "d1", username: "Driver One", commissionRate: 10 },
@@ -15,27 +14,27 @@ describe("driver statement export", () => {
     },
     summary: {
       salesCount: 1,
-      salesGrossUSD: 100,
-      discountsUSD: 10,
-      salesNetUSD: 90,
-      costUSD: 60,
-      profitUSD: 30,
-      returnsUSD: 0,
-      outstandingDebtUSD: 40,
-      cashOpeningUSD: 20,
-      cashClosingUSD: 60,
-      cashOpeningByCurrency: { USD: 20, SYP: 0 },
-      cashClosingByCurrency: { USD: 10, SYP: 500000 },
-      collectionsUSD: 50,
-      remittancesUSD: 10,
-      advancesUSD: 0,
-      expensesUSD: 0,
-      refundedUSD: 0,
-      commissionEarnedUSD: 5,
-      commissionPaidUSD: 0,
-      commissionOpeningUSD: 2,
-      commissionClosingUSD: 7,
-      unknownCollectionsUSD: 0,
+      salesGrossAmount: 100,
+      discountsAmount: 10,
+      salesNetAmount: 90,
+      costAmount: 60,
+      profitAmount: 30,
+      returnsAmount: 0,
+      outstandingDebtAmount: 40,
+      cashOpeningAmount: 20,
+      cashClosingAmount: 60,
+      cashOpeningByCurrency: { SYP: 0 },
+      cashClosingByCurrency: { SYP: 500000 },
+      collectionsAmount: 50,
+      remittancesAmount: 10,
+      advancesAmount: 0,
+      expensesAmount: 0,
+      refundedAmount: 0,
+      commissionEarnedAmount: 5,
+      commissionPaidAmount: 0,
+      commissionOpeningAmount: 2,
+      commissionClosingAmount: 7,
+      unknownCollectionsAmount: 0,
     },
     sales: [
       {
@@ -47,15 +46,14 @@ describe("driver statement export", () => {
         customerName: "زبون",
         vehicleId: "v1",
         vehicleName: "السيارة 1",
-        currency: "USD",
-        exchangeRate: 1,
-        grossUSD: 100,
-        discountUSD: 10,
-        netUSD: 90,
-        costUSD: 60,
-        profitUSD: 30,
-        returnsUSD: 0,
-        remainingDebtUSD: 40,
+        currency: "SYP",
+        grossAmount: 100,
+        discount: 10,
+        netAmount: 90,
+        costAmount: 60,
+        profitAmount: 30,
+        returnsAmount: 0,
+        remainingDebtAmount: 40,
         products: [
           {
             id: "p1",
@@ -79,12 +77,9 @@ describe("driver statement export", () => {
         driverId: "d1",
         driverName: "Driver One",
         currency: "SYP",
-        exchangeRate: 10000,
-        amountOriginal: 500000,
-        amountUSD: 50,
+        amount: 500000,
         commissionRate: 10,
-        commissionUSD: 5,
-        commissionOriginal: 50000,
+        commissionAmount: 5,
         isRefund: false,
         collectionSource: "driver",
         settlementMethod: "cash",
@@ -102,12 +97,11 @@ describe("driver statement export", () => {
       asOf: "2026-10-08T09:00:00Z",
       products: [],
       quantity: 0,
-      costUSD: 0,
+      costAmount: 0,
     },
     generatedAt: "2026-10-08T09:00:00Z",
     warnings: ["تحصيلات قديمة تحتاج مطابقة"],
   };
-
   it("exports filtered financial totals and original currency without recomputing collection commission", () => {
     const sheets = driverStatementExportSheets(report);
     expect(sheets["الملخص"]).toContainEqual({
@@ -115,7 +109,7 @@ describe("driver statement export", () => {
       القيمة: "2026-10-08",
     });
     expect(sheets["الملخص"]).toContainEqual({
-      البيان: "العمولة المتبقية USD",
+      البيان: "العمولة المتبقية ل.س",
       القيمة: 7,
     });
     expect(sheets["الملخص"]).toContainEqual({
@@ -123,11 +117,10 @@ describe("driver statement export", () => {
       القيمة: 500000,
     });
     expect(sheets["التحصيلات"][0]).toMatchObject({
-      المبلغ_الأصلي: 500000,
       العملة: "SYP",
-      المقابل_USD: 50,
+      المبلغ_بالليرة: 500000,
       النسبة: 10,
-      العمولة_USD: 5,
+      العمولة_بالليرة: 5,
     });
   });
   it("keeps product detail tied to the same filtered invoices and includes reconciliation notes", () => {
@@ -137,8 +130,8 @@ describe("driver statement export", () => {
       expect.objectContaining({
         الفاتورة: "sale1",
         الكمية: 2,
-        إجمالي_التكلفة_USD: 60,
-        إجمالي_البيع_USD: 100,
+        إجمالي_التكلفة_بالليرة: 60,
+        إجمالي_البيع_بالليرة: 100,
       }),
     ]);
     expect(sheets["الملخص"]).toContainEqual({

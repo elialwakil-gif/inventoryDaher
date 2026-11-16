@@ -23,10 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  goodsBalanceLabel,
-  goodsSettlementPreview,
-} from "@/lib/goodsSettlements";
+import { goodsBalanceLabel, goodsSettlementPreview } from "@/lib/goodsSettlements";
 import { formatMoney, toMoneyNumber } from "@/lib/money";
 import {
   createGoodsSettlement,
@@ -36,47 +33,37 @@ import {
 import getAllProducts from "@/services/products";
 import type { Product } from "@/services/transaction";
 import { getAllWarehouses } from "@/services/warehouse";
-
 interface SettlementParty {
   id?: string;
   name?: string;
   balance?: number;
-  balanceUSD?: number;
-  balanceSYP?: number;
   defaultReceivableAccountId?: string;
   defaultPayableAccountId?: string;
   defaultInventoryAccountId?: string;
 }
-
 interface Props {
   partyType: "customer" | "supplier";
   party: SettlementParty;
   invoice?: {
     id: string;
-    remainingUSD?: number;
     remainingDebt?: number;
-    exchangeRate?: number;
-    paymentCurrency?: string;
     currency?: string;
   };
 }
-
 interface DraftItem {
   productId: string;
   quantity: number;
   settlementPrice: number;
 }
-
 const normalizeText = (value: unknown) =>
   String(value ?? "")
     .normalize("NFKC")
     .trim()
     .toLowerCase()
-    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
+    .replace(/[ً-ٰٟـ]/g, "")
     .replace(/[أإآٱ]/g, "ا")
     .replace(/ى/g, "ي")
     .replace(/\s+/g, " ");
-
 export const refreshGoodsSettlementQueries = (
   queryClient: ReturnType<typeof useQueryClient>,
 ) => {
@@ -101,12 +88,7 @@ export const refreshGoodsSettlementQueries = (
     void queryClient.invalidateQueries({ queryKey: [key] });
   });
 };
-
-export default function GoodsSettlementForm({
-  partyType,
-  party,
-  invoice,
-}: Props) {
+export default function GoodsSettlementForm({ partyType, party, invoice }: Props) {
   const [open, setOpen] = useState(false);
   const [direction, setDirection] = useState<"receive" | "deliver">(
     partyType === "customer" ? "receive" : "deliver",
@@ -114,8 +96,7 @@ export default function GoodsSettlementForm({
   const [warehouse, setWarehouse] = useState("");
   const [items, setItems] = useState<DraftItem[]>([]);
   const [search, setSearch] = useState("");
-  const [currency, setCurrency] = useState<"USD" | "SYP">("USD");
-  const [exchangeRate, setExchangeRate] = useState(1);
+  const [currency, setCurrency] = useState<"SYP">("SYP");
   const [partyAccountId, setPartyAccountId] = useState("");
   const [inventoryAccountId, setInventoryAccountId] = useState("");
   const [differenceAccountId, setDifferenceAccountId] = useState("");
@@ -129,14 +110,12 @@ export default function GoodsSettlementForm({
   const isAdmin = useMemo(() => {
     try {
       return (
-        JSON.parse(localStorage.getItem("InventoryUser") || "null")?.role ===
-        "admin"
+        JSON.parse(localStorage.getItem("InventoryUser") || "null")?.role === "admin"
       );
     } catch {
       return false;
     }
   }, []);
-
   const productsQuery = useQuery<Product[]>({
     queryKey: ["goods-settlement-products"],
     queryFn: getAllProducts,
@@ -162,22 +141,14 @@ export default function GoodsSettlementForm({
     ...item,
     payPrice: toMoneyNumber(productMap.get(item.productId)?.payPrice),
   }));
-  const invoiceRate = invoice
-    ? (invoice.paymentCurrency || invoice.currency) === "SYP"
-      ? toMoneyNumber(invoice.exchangeRate)
-      : 0
-    : undefined;
   const preview = goodsSettlementPreview({
     items: previewItems,
     direction,
     currency,
-    exchangeRate,
-    balanceUSD: toMoneyNumber(party.balanceUSD ?? party.balance),
-    balanceSYP: toMoneyNumber(party.balanceSYP),
-    balanceRateSYP: invoiceRate,
+    balance: toMoneyNumber(party.balance),
   });
   const needsDifferenceAccount =
-    direction === "deliver" && Math.abs(preview.differenceUSD) >= 0.0005;
+    direction === "deliver" && Math.abs(preview.differenceAmount) >= 0.0005;
   const matches = products.filter((product) => {
     if (
       !selectedWarehouse ||
@@ -191,10 +162,7 @@ export default function GoodsSettlementForm({
     return words.every((word) => text.includes(word));
   });
   const selectedIds = new Set(items.map((item) => item.productId));
-  const availableProducts = matches.filter(
-    (product) => !selectedIds.has(product.id),
-  );
-
+  const availableProducts = matches.filter((product) => !selectedIds.has(product.id));
   const save = useMutation({
     mutationFn: createGoodsSettlement,
     onSuccess: () => {
@@ -204,20 +172,24 @@ export default function GoodsSettlementForm({
       refreshGoodsSettlementQueries(queryClient);
     },
     onError: (error) => {
-      if (!(error as Error & { outcomeUncertain?: boolean }).outcomeUncertain)
+      if (
+        !(
+          error as Error & {
+            outcomeUncertain?: boolean;
+          }
+        ).outcomeUncertain
+      )
         setSubmissionUncertain(false);
       toast.error(error.message);
     },
   });
-
   const setDialogOpen = (value: boolean) => {
     if (save.isPending) return;
     if (value && !open) {
       setItems([]);
       setWarehouse("");
       setSearch("");
-      setCurrency("USD");
-      setExchangeRate(1);
+      setCurrency("SYP");
       setDirection(partyType === "customer" ? "receive" : "deliver");
       setPartyAccountId(
         (partyType === "customer"
@@ -232,7 +204,6 @@ export default function GoodsSettlementForm({
     }
     setOpen(value);
   };
-
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (submissionUncertain && submission.current) {
@@ -241,8 +212,6 @@ export default function GoodsSettlementForm({
     }
     if (!party.id || !warehouse || !selectedWarehouse)
       return toast.error("اختر الطرف والمستودع");
-    if (!preview.validRate)
-      return toast.error("أدخل سعر صرف صحيحًا أكبر من صفر");
     if (
       !items.length ||
       items.some(
@@ -259,18 +228,14 @@ export default function GoodsSettlementForm({
       !inventoryAccountId ||
       (needsDifferenceAccount && !differenceAccountId)
     )
-      return toast.error(
-        "اختر حساب الطرف والمخزون وحساب فرق التسوية عند وجود فرق",
-      );
+      return toast.error("اختر حساب الطرف والمخزون وحساب فرق التسوية عند وجود فرق");
     const accountIds = [
       partyAccountId,
       inventoryAccountId,
       ...(needsDifferenceAccount ? [differenceAccountId] : []),
     ];
     if (new Set(accountIds).size !== accountIds.length)
-      return toast.error(
-        "حساب الطرف والمخزون والفرق يجب أن تكون حسابات مختلفة",
-      );
+      return toast.error("حساب الطرف والمخزون والفرق يجب أن تكون حسابات مختلفة");
     if (items.some((item) => !productMap.has(item.productId)))
       return toast.error("أحد الأصناف لم يعد متاحًا. حدّث قائمة الأصناف.");
     if (
@@ -286,11 +251,7 @@ export default function GoodsSettlementForm({
       )
     )
       return toast.error("كمية التسليم تتجاوز المخزون المتاح بعد الحجز");
-    if (
-      invoice &&
-      preview.totalUSD >
-        toMoneyNumber(invoice.remainingUSD ?? invoice.remainingDebt) + 0.0001
-    )
+    if (invoice && preview.totalPrice > toMoneyNumber(invoice.remainingDebt) + 0.0001)
       return toast.error("قيمة التسوية تتجاوز المتبقي على الفاتورة");
     const payload: Omit<GoodsSettlementInput, "requestId"> = {
       partyType,
@@ -301,7 +262,6 @@ export default function GoodsSettlementForm({
       warehouse,
       items,
       currency,
-      exchangeRate: currency === "USD" ? 1 : exchangeRate,
       note,
       partyAccountId,
       inventoryAccountId,
@@ -321,7 +281,6 @@ export default function GoodsSettlementForm({
     setSubmissionUncertain(true);
     save.mutate(submission.current.payload);
   };
-
   const addProduct = (product: Product) => {
     setItems((current) => [
       ...current,
@@ -329,30 +288,18 @@ export default function GoodsSettlementForm({
     ]);
     setSearch("");
   };
-  const updateItem = (
-    id: string,
-    key: "quantity" | "settlementPrice",
-    value: number,
-  ) =>
+  const updateItem = (id: string, key: "quantity" | "settlementPrice", value: number) =>
     setItems((current) =>
-      current.map((item) =>
-        item.productId === id ? { ...item, [key]: value } : item,
-      ),
+      current.map((item) => (item.productId === id ? { ...item, [key]: value } : item)),
     );
-
   if (!isAdmin) return null;
-
   return (
     <Dialog open={open} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
         <Button
           type="button"
           variant="outline"
-          disabled={
-            !party.id ||
-            (invoice &&
-              toMoneyNumber(invoice.remainingUSD ?? invoice.remainingDebt) <= 0)
-          }
+          disabled={!party.id || (invoice && toMoneyNumber(invoice.remainingDebt) <= 0)}
           onClick={(event) => event.stopPropagation()}
         >
           <Package className="ml-2 h-4 w-4" />
@@ -369,8 +316,8 @@ export default function GoodsSettlementForm({
         <DialogHeader className="text-right sm:text-right">
           <DialogTitle>تسوية بالبضاعة · {party.name}</DialogTitle>
           <DialogDescription>
-            تُحتسب القيمة بالسعر المتفق عليه وتُحدّث كمية المخزون ورصيد الحساب
-            عند التسجيل.
+            تُحتسب القيمة بالسعر المتفق عليه وتُحدّث كمية المخزون ورصيد الحساب عند
+            التسجيل.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
@@ -384,9 +331,7 @@ export default function GoodsSettlementForm({
                 <Select
                   value={direction}
                   disabled={Boolean(invoice)}
-                  onValueChange={(value: "receive" | "deliver") =>
-                    setDirection(value)
-                  }
+                  onValueChange={(value: "receive" | "deliver") => setDirection(value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -423,51 +368,11 @@ export default function GoodsSettlementForm({
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>عملة السعر المتفق عليه</Label>
-                <Select
-                  value={currency}
-                  onValueChange={(value: "USD" | "SYP") => {
-                    setCurrency(value);
-                    setItems((current) =>
-                      current.map((item) => ({ ...item, settlementPrice: 0 })),
-                    );
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="SYP">SYP</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor={`goods-rate-${party.id}`}>
-                  سعر الصرف · SYP لكل USD
-                </Label>
-                <Input
-                  id={`goods-rate-${party.id}`}
-                  type="number"
-                  min="0.001"
-                  step="any"
-                  value={currency === "USD" ? 1 : exchangeRate}
-                  disabled={currency === "USD"}
-                  onChange={(event) =>
-                    setExchangeRate(Number(event.target.value))
-                  }
-                />
-              </div>
             </div>
             {invoice && (
               <p className="rounded-md border bg-muted p-3 text-sm">
                 المتبقي على الفاتورة:{" "}
-                {formatMoney(
-                  toMoneyNumber(invoice.remainingUSD ?? invoice.remainingDebt),
-                  "USD",
-                )}
-                . تسديد{" "}
+                {formatMoney(toMoneyNumber(invoice.remainingDebt), "SYP")}. تسديد{" "}
                 {partyType === "customer"
                   ? "فاتورة البيع يكون باستلام بضاعة من الزبون"
                   : "فاتورة الشراء يكون بتسليم بضاعة إلى المورد"}
@@ -482,9 +387,7 @@ export default function GoodsSettlementForm({
                 id={`goods-search-${party.id}`}
                 value={search}
                 disabled={!warehouse}
-                placeholder={
-                  warehouse ? "ابحث عن الصنف" : "اختر المستودع أولًا"
-                }
+                placeholder={warehouse ? "ابحث عن الصنف" : "اختر المستودع أولًا"}
                 onChange={(event) => setSearch(event.target.value)}
               />
               {(productsQuery.isLoading || warehousesQuery.isLoading) && (
@@ -588,8 +491,7 @@ export default function GoodsSettlementForm({
                         quantityBefore +
                         (direction === "receive" ? 1 : -1) * item.quantity;
                       const available =
-                        quantityBefore -
-                        toMoneyNumber(product?.reservedQuantity);
+                        quantityBefore - toMoneyNumber(product?.reservedQuantity);
                       return (
                         <tr key={item.productId} className="border-b">
                           <td className="p-2">
@@ -655,8 +557,7 @@ export default function GoodsSettlementForm({
                               onClick={() =>
                                 setItems((current) =>
                                   current.filter(
-                                    (entry) =>
-                                      entry.productId !== item.productId,
+                                    (entry) => entry.productId !== item.productId,
                                   ),
                                 )
                               }
@@ -673,9 +574,7 @@ export default function GoodsSettlementForm({
             )}
             <div className="grid gap-3 sm:grid-cols-3">
               <AccountSelect
-                label={
-                  partyType === "customer" ? "حساب العملاء" : "حساب الموردين"
-                }
+                label={partyType === "customer" ? "حساب العملاء" : "حساب الموردين"}
                 value={partyAccountId}
                 onChange={setPartyAccountId}
                 filterType={partyType === "customer" ? "receivable" : "payable"}
@@ -706,22 +605,16 @@ export default function GoodsSettlementForm({
           </fieldset>
           <div className="grid gap-3 rounded-lg border bg-muted/40 p-4 sm:grid-cols-2">
             <div>
-              <span className="text-sm text-muted-foreground">
-                قيمة التسوية
-              </span>
-              <p className="font-bold">
-                {formatMoney(preview.totalOriginal, currency)}
-                {currency === "SYP" &&
-                  ` / ${formatMoney(preview.totalUSD, "USD")}`}
-              </p>
+              <span className="text-sm text-muted-foreground">قيمة التسوية</span>
+              <p className="font-bold">{formatMoney(preview.totalPrice, currency)}</p>
             </div>
             <div>
               <span className="text-sm text-muted-foreground">
                 تكلفة المخزون / فرق التسوية
               </span>
               <p>
-                {formatMoney(preview.costUSD, "USD")} /{" "}
-                {formatMoney(preview.differenceUSD, "USD")}
+                {formatMoney(preview.costAmount, "SYP")} /{" "}
+                {formatMoney(preview.differenceAmount, "SYP")}
               </p>
             </div>
             <div>
@@ -729,27 +622,13 @@ export default function GoodsSettlementForm({
                 رصيد الحساب قبل التسوية
               </span>
               <p>
-                {formatMoney(
-                  Math.abs(toMoneyNumber(party.balanceUSD ?? party.balance)),
-                  "USD",
-                )}{" "}
-                ·{" "}
-                {goodsBalanceLabel(
-                  toMoneyNumber(party.balanceUSD ?? party.balance),
-                  partyType,
-                )}
+                {formatMoney(Math.abs(toMoneyNumber(party.balance)), "SYP")} ·{" "}
+                {goodsBalanceLabel(toMoneyNumber(party.balance), partyType)}
               </p>
-              {toMoneyNumber(party.balanceSYP) !== 0 && (
+              {toMoneyNumber(party.balance) !== 0 && (
                 <p>
-                  {formatMoney(
-                    Math.abs(toMoneyNumber(party.balanceSYP)),
-                    "SYP",
-                  )}{" "}
-                  ·{" "}
-                  {goodsBalanceLabel(
-                    toMoneyNumber(party.balanceSYP),
-                    partyType,
-                  )}
+                  {formatMoney(Math.abs(toMoneyNumber(party.balance)), "SYP")} ·{" "}
+                  {goodsBalanceLabel(toMoneyNumber(party.balance), partyType)}
                 </p>
               )}
             </div>
@@ -758,21 +637,15 @@ export default function GoodsSettlementForm({
                 رصيد الحساب بعد التسوية
               </span>
               <p className="font-semibold">
-                {formatMoney(Math.abs(preview.nextUSD), "USD")} ·{" "}
-                {goodsBalanceLabel(preview.nextUSD, partyType)}
+                {formatMoney(Math.abs(preview.nextAmount), "SYP")} ·{" "}
+                {goodsBalanceLabel(preview.nextAmount, partyType)}
               </p>
-              {preview.nextSYP !== 0 && (
-                <p>
-                  {formatMoney(Math.abs(preview.nextSYP), "SYP")} ·{" "}
-                  {goodsBalanceLabel(preview.nextSYP, partyType)}
-                </p>
-              )}
             </div>
           </div>
           {submissionUncertain && !save.isPending && (
             <p className="text-sm">
-              يمكن إعادة إرسال العملية نفسها بأمان للتحقق من تسجيلها. لإدخال
-              عملية أخرى أغلق النموذج وافتحه بعد تحديث كشف الحساب.
+              يمكن إعادة إرسال العملية نفسها بأمان للتحقق من تسجيلها. لإدخال عملية أخرى
+              أغلق النموذج وافتحه بعد تحديث كشف الحساب.
             </p>
           )}
           <Button

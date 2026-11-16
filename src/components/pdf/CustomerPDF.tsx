@@ -1,18 +1,15 @@
 import { Text, View, StyleSheet } from "@react-pdf/renderer";
-
 export interface Operations {
   details: string;
   date: string;
   toTheCustoemr: number;
   fromCustomer: number;
 }
-
 interface CustomerPDFProp {
   customerName: string;
   balance: number;
   operations: Operations[];
 }
-
 export default function CustomerPDF({
   customerName,
   balance,
@@ -32,7 +29,7 @@ export default function CustomerPDF({
         </View>
 
         <View style={styles.infoRow}>
-          <Text>:رصيد الحساب (USD)</Text>
+          <Text>:رصيد الحساب (SYP)</Text>
           <Text style={styles.ltr}>{balance}</Text>
         </View>
       </View>
@@ -62,22 +59,21 @@ export default function CustomerPDF({
       {0 > 0 && (
         <View style={styles.totalContainer}>
           <Text style={styles.totalLabel}>الحسم:</Text>
-          <Text style={styles.totalAmount}>{"0.00"}</Text>
+          <Text style={styles.totalPrice}>{"0.00"}</Text>
         </View>
       )}
 
       {/* Total */}
       {/* <View style={styles.totalContainer}>
-        <Text style={styles.totalLabel}>المجموع:</Text>
-        <Text style={styles.totalAmount}>{"0.00"}</Text>
-      </View> */}
+              <Text style={styles.totalLabel}>المجموع:</Text>
+              <Text style={styles.totalAmount}>{"0.00"}</Text>
+            </View> */}
 
       {/* Footer */}
       <Text style={styles.footer}>شكراً لتعاملكم معنا</Text>
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     fontFamily: "Amiri",
@@ -86,7 +82,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     direction: "rtl",
   },
-
   header: {
     fontSize: 28,
     fontWeight: "bold",
@@ -128,7 +123,6 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     textAlign: "center",
   },
-
   // أعمدة الجدول
   cellDetails: {
     flex: 3,
@@ -154,7 +148,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     flexWrap: "wrap",
   },
-
   totalContainer: {
     flexDirection: "row-reverse",
     justifyContent: "flex-end",
@@ -170,7 +163,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginRight: 8,
   },
-  totalAmount: {
+  totalPrice: {
     fontSize: 14,
     fontWeight: "bold",
     color: "#000",
@@ -187,7 +180,6 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: 4,
   },
-
   ltr: {
     direction: "ltr",
   },

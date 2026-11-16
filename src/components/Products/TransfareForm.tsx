@@ -11,45 +11,28 @@ import PaymentTypeSelector from "../sellProduct/PaymentTypeSelector";
 import { Button } from "../ui/button";
 import FormInput from "../ui/custom/FormInput";
 import PopupForm from "../ui/custom/PopupForm";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
 import WarehouseSelect from "../Warehouses/WarehouseSelect";
-
 interface TransferFormProps {
   row: ProductTableRow;
   isOpen: boolean;
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
-
 const transferSchema = z.object({
   warehouse: z.string().min(1, "اختر المستودع المنقول إليه"),
   quantity: z.coerce.number().positive("الكمية يجب أن تكون أكبر من صفر"),
   sellPrice: z.coerce.number().positive("سعر المبيع غير صحيح"),
   amount: z.coerce.number().min(0, "تكلفة النقل غير صحيحة"),
-  currency: z.enum(["USD", "SYP"]),
-  exchangeRate: z.coerce.number().positive("سعر الصرف غير صحيح"),
+  currency: z.enum(["SYP"]),
   note: z.string().optional(),
 });
-
 type TransferFormValues = z.infer<typeof transferSchema>;
-
-export default function TransferForm({
-  row,
-  isOpen,
-  setIsOpen,
-}: TransferFormProps) {
+export default function TransferForm({ row, isOpen, setIsOpen }: TransferFormProps) {
   const queryClient = useQueryClient();
   const [isDebt, setIsDebt] = useState<"cash" | "debt" | "part">("cash");
   const [partValue, setPartValue] = useState(0);
   const [expenseAccountId, setExpenseAccountId] = useState("");
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [payableAccountId, setPayableAccountId] = useState("");
-
   const {
     control,
     handleSubmit,
@@ -64,25 +47,19 @@ export default function TransferForm({
       quantity: 0,
       sellPrice: row.sellPrice,
       amount: 0,
-      currency: "USD",
-      exchangeRate: 1,
+      currency: "SYP",
       note: "",
     },
   });
-
   const transferAmount = Number(watch("amount") || 0);
-  const currency = watch("currency");
-
   useEffect(() => {
     if (!row) return;
-
     reset({
       warehouse: "",
       quantity: 0,
       sellPrice: row.sellPrice,
       amount: 0,
-      currency: "USD",
-      exchangeRate: 1,
+      currency: "SYP",
       note: "",
     });
     setExpenseAccountId("");
@@ -91,14 +68,11 @@ export default function TransferForm({
     setIsDebt("cash");
     setPartValue(0);
   }, [row, reset]);
-
   const warehouseTransfare = useMutation({
     mutationFn: (transferData: {
       productId: string;
       oldWarehouse: string;
       newWarehouse: string;
-      exchangeRate: number;
-      amount_base: number;
       amount: number;
       currency: string;
       quantity: number;
@@ -120,44 +94,43 @@ export default function TransferForm({
       toast.error("حدث خطأ أثناء نقل المنتج");
     },
   });
-
   const onSubmit = (values: TransferFormValues) => {
     if (values.quantity > row.quantity) {
       toast.error("الكمية المدخلة أكبر من الكمية المتوفرة");
       return;
     }
-
     if (values.amount > 0 && isDebt === "part" && partValue <= 0) {
       toast.error("الرجاء إدخال قيمة الدفعة الجزئية");
       return;
     }
-
     if (values.amount > 0 && isDebt === "part" && partValue >= values.amount) {
       toast.error("قيمة الدفعة الجزئية يجب أن تكون أقل من المبلغ الكلي");
       return;
     }
-
     if (values.amount > 0 && !expenseAccountId) {
       toast.error("الرجاء اختيار حساب أجور النقل");
       return;
     }
-
-    if (values.amount > 0 && (isDebt === "cash" || isDebt === "part") && !paymentAccountId) {
+    if (
+      values.amount > 0 &&
+      (isDebt === "cash" || isDebt === "part") &&
+      !paymentAccountId
+    ) {
       toast.error("الرجاء اختيار حساب الدفع");
       return;
     }
-
-    if (values.amount > 0 && (isDebt === "debt" || isDebt === "part") && !payableAccountId) {
+    if (
+      values.amount > 0 &&
+      (isDebt === "debt" || isDebt === "part") &&
+      !payableAccountId
+    ) {
       toast.error("الرجاء اختيار حساب الموردين");
       return;
     }
-
     warehouseTransfare.mutate({
       productId: row.id,
       oldWarehouse: row.warehouse,
       newWarehouse: values.warehouse,
-      exchangeRate: values.currency === "USD" ? 1 : values.exchangeRate,
-      amount_base: values.amount,
       amount: values.amount,
       currency: values.currency,
       quantity: values.quantity,
@@ -172,18 +145,11 @@ export default function TransferForm({
         values.amount > 0 && isDebt !== "cash" ? payableAccountId : undefined,
     });
   };
-
   const handleSetMaxQuantity = () => {
     setValue("quantity", row.quantity);
   };
-
   return (
-    <PopupForm
-      isOpen={isOpen}
-      setIsOpen={setIsOpen}
-      trigger={<></>}
-      title="نقل منتج"
-    >
+    <PopupForm isOpen={isOpen} setIsOpen={setIsOpen} trigger={<></>} title="نقل منتج">
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="grid grid-cols-1 gap-4 overflow-y-auto overflow-x-hidden max-h-[75vh] md:grid-cols-2">
           <FormInput label="اسم المنتج" disabled value={row.name} />
@@ -260,41 +226,9 @@ export default function TransferForm({
                 )}
               />
             </div>
-
-            <Controller
-              name="currency"
-              control={control}
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="mt-6 rounded-r-none">
-                    <SelectValue placeholder="العملة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["SYP", "USD"].map((item) => (
-                      <SelectItem key={item} value={item}>
-                        {item}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
           </div>
 
-          {currency === "SYP" && transferAmount > 0 && (
-            <Controller
-              name="exchangeRate"
-              control={control}
-              render={({ field }) => (
-                <FormInput
-                  type="number"
-                  label="سعر الصرف"
-                  value={field.value}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                />
-              )}
-            />
-          )}
+          {transferAmount > 0 && null}
 
           <div className="md:col-span-2">
             <PaymentTypeSelector

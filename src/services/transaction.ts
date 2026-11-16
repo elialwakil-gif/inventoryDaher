@@ -1,15 +1,14 @@
 import apiClient from "@/lib/axios";
 import { buildCashPaymentMoney } from "@/lib/cashPayment";
-
 export type ProductPriceType =
   | "payPrice"
   | "wholesalePrice"
   | "superWholesalePrice"
   | "sellPrice"
   | "custom";
-
 export interface sell {
   id?: string;
+  requestId?: string;
   customerId: string;
   totalPrice: number;
   paymentStatus: "cash" | "part" | "debt";
@@ -39,36 +38,21 @@ export interface sell {
   }[];
   date?: string;
   currency: string;
-  exchangeRate: number;
-  amount_base: number;
-  priceCurrency?: "USD";
-  paymentCurrency?: "USD" | "SYP";
-  subtotalUSD?: number;
-  totalUSD?: number;
-  totalSYP?: number;
-  totalOriginal?: number;
-  paidUSD?: number;
-  paidSYP?: number;
-  paidOriginal?: number;
-  remainingUSD?: number;
-  remainingSYP?: number;
-  remainingOriginal?: number;
+  amount: number;
+  subtotal?: number;
+  paidAmount?: number;
   discountType?: "none" | "amount" | "percent" | "mixed";
   discountPercent?: number;
-  discountPercentUSD?: number;
-  discountAmountUSD?: number;
-  discountUSD?: number;
-  discountSYP?: number;
-  discountOriginal?: number;
-  partValue: number;
+  discountPercentAmount?: number;
+  discountAmount?: number;
   discount?: number;
+  partValue: number;
   vehicleId?: string;
   vehicleName?: string;
   driverId?: string;
   driverName?: string;
   sourceWarehouse?: string;
 }
-
 export interface returnData {
   productCode: string;
   productName?: string;
@@ -88,7 +72,6 @@ export interface returnData {
   receivableAccountId?: string;
   salesAccountId?: string;
 }
-
 export interface Product {
   id: string;
   name: string;
@@ -105,7 +88,6 @@ export interface Product {
   warehouse: string;
   updatedDate: string;
 }
-
 export type TransactionServiceError = Error & {
   response?: any;
   status?: number;
@@ -113,7 +95,6 @@ export type TransactionServiceError = Error & {
   isNetworkError?: boolean;
   originalError?: unknown;
 };
-
 const createTransactionServiceError = (
   error: any,
   fallbackMessage: string,
@@ -126,18 +107,16 @@ const createTransactionServiceError = (
     error?.message ||
     fallbackMessage;
   const nextError = new Error(message) as TransactionServiceError;
-
   nextError.response = error?.response;
   nextError.status = error?.response?.status;
   nextError.code = error?.code;
   nextError.isNetworkError = !error?.response;
   nextError.originalError = error;
-
   return nextError;
 };
-
 export interface purchase {
   id: string;
+  requestId?: string;
   supplierId: string;
   name?: string;
   code: string;
@@ -147,21 +126,10 @@ export interface purchase {
   totalPrice: number;
   paymentStatus: string;
   currency: string;
-  exchangeRate: number;
-  amount_base: number;
-  priceCurrency?: "USD";
-  paymentCurrency?: "USD" | "SYP";
-  totalUSD?: number;
-  totalSYP?: number;
-  totalOriginal?: number;
-  paidUSD?: number;
-  paidSYP?: number;
-  paidOriginal?: number;
-  remainingUSD?: number;
-  remainingSYP?: number;
-  remainingOriginal?: number;
+  amount: number;
+  paidAmount?: number;
+  remainingDebt?: number;
   partValue?: number;
-  remainingDebt: number;
   inventoryAccountId: string;
   payableAccountId: string;
   paymentAccountId?: string;
@@ -182,7 +150,6 @@ export interface purchase {
     lineTotal?: number;
   }>;
 }
-
 export async function payNewProduct({
   newPurchase,
   newProduct,
@@ -198,15 +165,12 @@ export async function payNewProduct({
     return response.data;
   } catch (err: any) {
     console.error("خطأ في تسجيل الدخول:", err);
-
     if (err.response && err.response.data?.message) {
       throw new Error(err.response.data.message);
     }
-
     throw new Error("فشل الاتصال بالسيرفر");
   }
 }
-
 export async function purchaseInvoice({ newPurchase }: { newPurchase: any }) {
   try {
     const response = await apiClient.post("/api/transactions/purchase-invoice", {
@@ -215,15 +179,12 @@ export async function purchaseInvoice({ newPurchase }: { newPurchase: any }) {
     return response.data;
   } catch (err: any) {
     console.error("Purchase invoice error:", err);
-
     if (err.response && err.response.data?.message) {
       throw new Error(err.response.data.message);
     }
-
     throw new Error("Failed to connect to server");
   }
 }
-
 export async function sellProducts({ newSell }: { newSell: sell }) {
   try {
     const response = await apiClient.post("/api/transactions/sell", {
@@ -236,50 +197,13 @@ export async function sellProducts({ newSell }: { newSell: sell }) {
   }
 }
 
-export async function endExchange({
-  exchangeData,
-  realRate,
-  amount_final,
-  id,
-}: {
-  exchangeData: any;
-  realRate: number;
-  amount_final: number;
-  id: string;
-}) {
-  try {
-    const response = await apiClient.post("/api/transactions/endExchange", {
-      exchangeData,
-      realRate,
-      amount_final,
-      id,
-    });
-    return response.data;
-  } catch (err: any) {
-    console.error("خطأ في تسجيل الدخول:", err);
-
-    if (err.response && err.response.data?.message) {
-      throw new Error(err.response.data.message);
-    }
-
-    throw new Error("فشل الاتصال بالسيرفر");
-  }
-}
-
 type CashPartyPaymentInput = {
   requestId?: string;
   amount: number;
   note: string;
   currency: string;
-  exchangeRate: number;
-  amount_base: number;
-  amountUSD?: number;
-  amountSYP?: number;
-  amountOriginal?: number;
-  paymentCurrency?: "USD" | "SYP";
   paymentAccountId: string;
 };
-
 // Keep the same request identifier after an uncertain response, including reloads.
 const pendingCashRequests = new Map<string, string>();
 const pendingStorageKey = "inventory-pending-cash-payments";
@@ -289,23 +213,38 @@ const readPendingCashRequests = () => {
     for (const [key, id] of Object.entries(stored)) {
       if (typeof id === "string") pendingCashRequests.set(key, id);
     }
-  } catch { /* Storage may be unavailable. */ }
+  } catch {
+    /* Storage may be unavailable. */
+  }
 };
 const persistPendingCashRequests = () => {
   try {
-    sessionStorage.setItem(pendingStorageKey, JSON.stringify(Object.fromEntries(pendingCashRequests)));
-  } catch { /* The in-memory identifier still protects retries in this tab. */ }
+    sessionStorage.setItem(
+      pendingStorageKey,
+      JSON.stringify(Object.fromEntries(pendingCashRequests)),
+    );
+  } catch {
+    /* The in-memory identifier still protects retries in this tab. */
+  }
 };
-
-const postCashPartyPayment = async (endpoint: string, paymentData: Record<string, unknown>, requestId?: string) => {
+const postCashPartyPayment = async (
+  endpoint: string,
+  paymentData: Record<string, unknown>,
+  requestId?: string,
+) => {
   const fingerprint = JSON.stringify([endpoint, paymentData]);
   readPendingCashRequests();
-  const id = requestId || pendingCashRequests.get(fingerprint) ||
-    globalThis.crypto?.randomUUID?.() || `cash-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const id =
+    requestId ||
+    pendingCashRequests.get(fingerprint) ||
+    globalThis.crypto?.randomUUID?.() ||
+    `cash-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   pendingCashRequests.set(fingerprint, id);
   persistPendingCashRequests();
   try {
-    const response = await apiClient.post(endpoint, { paymentData: { ...paymentData, requestId: id } });
+    const response = await apiClient.post(endpoint, {
+      paymentData: { ...paymentData, requestId: id },
+    });
     pendingCashRequests.delete(fingerprint);
     persistPendingCashRequests();
     return response.data;
@@ -315,50 +254,74 @@ const postCashPartyPayment = async (endpoint: string, paymentData: Record<string
       pendingCashRequests.delete(fingerprint);
       persistPendingCashRequests();
     }
-    throw new Error(error.response?.data?.message || "تعذر الاتصال بالخادم. عند إعادة المحاولة بالبيانات نفسها لن تُكرر الدفعة.");
+    throw new Error(
+      error.response?.data?.message ||
+        "تعذر الاتصال بالخادم. عند إعادة المحاولة بالبيانات نفسها لن تُكرر الدفعة.",
+    );
   }
 };
-
-export async function payCustomerDebt(dataToSend: CashPartyPaymentInput & {
-  customerId: string;
-  sellId?: string;
-  receivableAccountId: string;
-}) {
-  if (!dataToSend.customerId || !dataToSend.paymentAccountId || !dataToSend.receivableAccountId || dataToSend.paymentAccountId === dataToSend.receivableAccountId) {
+export async function payCustomerDebt(
+  dataToSend: CashPartyPaymentInput & {
+    customerId: string;
+    sellId?: string;
+    receivableAccountId: string;
+  },
+) {
+  if (
+    !dataToSend.customerId ||
+    !dataToSend.paymentAccountId ||
+    !dataToSend.receivableAccountId ||
+    dataToSend.paymentAccountId === dataToSend.receivableAccountId
+  ) {
     throw new Error("يرجى تحديد الزبون وحسابي النقد والعملاء بشكل صحيح");
   }
   const money = buildCashPaymentMoney(dataToSend);
-  if (dataToSend.sellId && money.amount < 0) throw new Error("تسديد فاتورة الزبون يتطلب دفعة من الزبون");
-  return postCashPartyPayment("/api/transactions/customerPayment", {
-    customerId: dataToSend.customerId,
-    sellId: dataToSend.sellId,
-    ...money,
-    note: dataToSend.note,
-    paymentAccountId: dataToSend.paymentAccountId,
-    receivableAccountId: dataToSend.receivableAccountId,
-  }, dataToSend.requestId);
+  if (dataToSend.sellId && money.amount < 0)
+    throw new Error("تسديد فاتورة الزبون يتطلب دفعة من الزبون");
+  return postCashPartyPayment(
+    "/api/transactions/customerPayment",
+    {
+      customerId: dataToSend.customerId,
+      sellId: dataToSend.sellId,
+      ...money,
+      note: dataToSend.note,
+      paymentAccountId: dataToSend.paymentAccountId,
+      receivableAccountId: dataToSend.receivableAccountId,
+    },
+    dataToSend.requestId,
+  );
 }
-
-export async function paySupplierDebt(dataToSend: CashPartyPaymentInput & {
-  supplierId: string;
-  purchaseId?: string;
-  payableAccountId: string;
-}) {
-  if (!dataToSend.supplierId || !dataToSend.paymentAccountId || !dataToSend.payableAccountId || dataToSend.paymentAccountId === dataToSend.payableAccountId) {
+export async function paySupplierDebt(
+  dataToSend: CashPartyPaymentInput & {
+    supplierId: string;
+    purchaseId?: string;
+    payableAccountId: string;
+  },
+) {
+  if (
+    !dataToSend.supplierId ||
+    !dataToSend.paymentAccountId ||
+    !dataToSend.payableAccountId ||
+    dataToSend.paymentAccountId === dataToSend.payableAccountId
+  ) {
     throw new Error("يرجى تحديد المورد وحسابي النقد والموردين بشكل صحيح");
   }
   const money = buildCashPaymentMoney(dataToSend);
-  if (dataToSend.purchaseId && money.amount > 0) throw new Error("تسديد فاتورة الشراء يتطلب دفعة للمورد");
-  return postCashPartyPayment("/api/transactions/supplierPayment", {
-    supplierId: dataToSend.supplierId,
-    purchaseId: dataToSend.purchaseId,
-    ...money,
-    note: dataToSend.note,
-    paymentAccountId: dataToSend.paymentAccountId,
-    payableAccountId: dataToSend.payableAccountId,
-  }, dataToSend.requestId);
+  if (dataToSend.purchaseId && money.amount > 0)
+    throw new Error("تسديد فاتورة الشراء يتطلب دفعة للمورد");
+  return postCashPartyPayment(
+    "/api/transactions/supplierPayment",
+    {
+      supplierId: dataToSend.supplierId,
+      purchaseId: dataToSend.purchaseId,
+      ...money,
+      note: dataToSend.note,
+      paymentAccountId: dataToSend.paymentAccountId,
+      payableAccountId: dataToSend.payableAccountId,
+    },
+    dataToSend.requestId,
+  );
 }
-
 export async function handleCustomerReturn(newReturn: {
   productCode?: string;
   productName?: string;
@@ -407,15 +370,12 @@ export async function handleCustomerReturn(newReturn: {
     return response.data;
   } catch (err: any) {
     console.error("خطأ :", err);
-
     if (err.response && err.response.data?.message) {
       throw new Error(err.response.data.message);
     }
-
     throw new Error("فشل الاتصال بالسيرفر");
   }
 }
-
 export async function handleSupplierReturn(newReturn: {
   productCode: string;
   productName?: string;
@@ -456,21 +416,16 @@ export async function handleSupplierReturn(newReturn: {
     return response.data;
   } catch (err: any) {
     console.error("خطأ :", err);
-
     if (err.response && err.response.data?.message) {
       throw new Error(err.response.data.message);
     }
-
     throw new Error("فشل الاتصال بالسيرفر");
   }
 }
-
 export async function handleWarehouseTransfare(transferData: {
   productId: string;
   oldWarehouse: string;
   newWarehouse: string;
-  exchangeRate: number;
-  amount_base: number;
   amount: number;
   currency: string;
   quantity: number;
@@ -483,24 +438,18 @@ export async function handleWarehouseTransfare(transferData: {
   payableAccountId?: string;
 }) {
   try {
-    const response = await apiClient.post(
-      "/api/transactions/warehouseTransfer",
-      {
-        transferData,
-      },
-    );
+    const response = await apiClient.post("/api/transactions/warehouseTransfer", {
+      transferData,
+    });
     return response.data;
   } catch (err: any) {
     console.error("خطأ :", err);
-
     if (err.response && err.response.data?.message) {
       throw new Error(err.response.data.message);
     }
-
     throw new Error("فشل الاتصال بالسيرفر");
   }
 }
-
 export async function handleAfterSellDiscount({
   discount,
   sellId,
@@ -511,22 +460,17 @@ export async function handleAfterSellDiscount({
   customerId: string;
 }) {
   try {
-    const response = await apiClient.post(
-      "/api/transactions/afterSellDiscount",
-      {
-        discount,
-        sellId,
-        customerId,
-      },
-    );
+    const response = await apiClient.post("/api/transactions/afterSellDiscount", {
+      discount,
+      sellId,
+      customerId,
+    });
     return response.data;
   } catch (err: any) {
     console.error("خطأ :", err);
-
     if (err.response && err.response.data?.message) {
       throw new Error(err.response.data.message);
     }
-
     throw new Error("فشل الاتصال بالسيرفر");
   }
 }

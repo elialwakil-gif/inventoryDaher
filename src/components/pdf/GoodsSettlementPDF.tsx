@@ -2,7 +2,6 @@ import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import { goodsPaymentLabel } from "@/lib/goodsSettlements";
 import { formatMoney } from "@/lib/money";
 import type { Payment } from "@/services/payments";
-
 const styles = StyleSheet.create({
   title: { textAlign: "right", fontSize: 20, marginBottom: 12 },
   line: { textAlign: "right", fontSize: 11, marginBottom: 5 },
@@ -15,7 +14,6 @@ const styles = StyleSheet.create({
   cell: { width: "20%", fontSize: 10, textAlign: "right", padding: 3 },
   name: { width: "40%", fontSize: 10, textAlign: "right", padding: 3 },
 });
-
 export default function GoodsSettlementPDF({
   payment,
   partyName,
@@ -23,7 +21,7 @@ export default function GoodsSettlementPDF({
   payment: Payment;
   partyName: string;
 }) {
-  const currency = payment.paymentCurrency || payment.currency;
+  const currency = payment.currency;
   return (
     <View>
       <Text style={styles.title}>{goodsPaymentLabel(payment)}</Text>
@@ -53,7 +51,7 @@ export default function GoodsSettlementPDF({
         {(payment.goodsItems || []).map((item) => (
           <View key={item.productId} style={styles.row}>
             <Text style={styles.cell}>
-              {formatMoney(item.lineTotalOriginal, currency)}
+              {formatMoney(item.lineTotalAmount, currency)}
             </Text>
             <Text style={styles.cell}>
               {formatMoney(item.settlementPrice, currency)}
@@ -68,27 +66,11 @@ export default function GoodsSettlementPDF({
         ))}
       </View>
       <Text style={styles.line}>
-        قيمة التسوية:{" "}
-        {formatMoney(
-          Math.abs(payment.amountOriginal ?? payment.amount_base),
-          currency,
-        )}
+        قيمة التسوية: {formatMoney(Math.abs(payment.amount), currency)}
       </Text>
+
       <Text style={styles.line}>
-        القيمة بالدولار:{" "}
-        {formatMoney(Math.abs(payment.amountUSD ?? payment.amount), "USD")}
-      </Text>
-      {currency === "SYP" && (
-        <Text style={styles.line}>
-          سعر الصرف: {payment.exchangeRate} SYP / USD
-        </Text>
-      )}
-      <Text style={styles.line}>
-        أثر الرصيد:{" "}
-        {formatMoney(
-          payment.balanceUSDChange ?? payment.amountUSD ?? payment.amount,
-          "USD",
-        )}
+        أثر الرصيد: {formatMoney(payment.balanceChange ?? payment.amount, "SYP")}
       </Text>
       <Text style={styles.line}>الملاحظات: {payment.note || "-"}</Text>
       <Text style={styles.line}>المنفذ: {payment.actorName || "-"}</Text>

@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDriverStatement, recordDriverCollection } from "./driverStatements";
-
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/axios", () => ({ default: api }));
-
 describe("driver finance API", () => {
   beforeEach(() => vi.resetAllMocks());
   it("keeps authenticated server permission and debt validation messages visible", async () => {
@@ -13,9 +11,9 @@ describe("driver finance API", () => {
         data: { error: "ليس لديك صلاحية لهذه العملية" },
       },
     });
-    await expect(
-      getDriverStatement({ driverId: "another-driver" }),
-    ).rejects.toThrow("ليس لديك صلاحية لهذه العملية");
+    await expect(getDriverStatement({ driverId: "another-driver" })).rejects.toThrow(
+      "ليس لديك صلاحية لهذه العملية",
+    );
     api.post.mockRejectedValue({
       response: {
         status: 400,
@@ -28,9 +26,8 @@ describe("driver finance API", () => {
         driverId: "d1",
         sellId: "s1",
         customerId: "c1",
-        amountOriginal: 100000,
+        amount: 100000,
         currency: "SYP",
-        exchangeRate: 10000,
         paymentAccountId: "cash",
         receivableAccountId: "ar",
       }),
@@ -46,7 +43,7 @@ describe("driver finance API", () => {
         dateTo: "2026-10-08",
         vehicleId: "v1",
       },
-      summary: { commissionEarnedUSD: 20 },
+      summary: { commissionEarnedAmount: 20 },
     };
     api.get.mockResolvedValue({ data: statement });
     expect(await getDriverStatement(statement.filters)).toBe(statement);

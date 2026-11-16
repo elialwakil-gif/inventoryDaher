@@ -1,3 +1,4 @@
+import { formatMoney as formatLira } from "@/lib/money";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -23,49 +24,32 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSells, type Sell } from "@/hooks/useSell";
-import { formatMoney } from "@/lib/money";
-import {
-  getSaleTimestamp,
-  isSaleOnDate,
-  sortSalesByDateDesc,
-} from "@/lib/salesDates";
+import { getSaleTimestamp, isSaleOnDate, sortSalesByDateDesc } from "@/lib/salesDates";
 import getAllCustomer from "@/services/customer";
-
 const toNumber = (value: unknown) => {
   const next = Number(value);
   return Number.isFinite(next) ? next : 0;
 };
 
-const formatDualCurrency = (usd: number, syp = 0) => {
-  const usdText = formatMoney(usd, "USD");
-  return syp ? `${usdText} / ${formatMoney(syp, "SYP")}` : usdText;
-};
-
 const getSaleId = (sale: Sell) => String(sale.id ?? sale.sellId ?? "");
-
 const getSaleInvoiceLabel = (sale: Sell) => {
   const id = getSaleId(sale);
   const invoiceNumber = String(sale.invoiceNumber || sale.sellId || "");
-
   if (invoiceNumber) return invoiceNumber;
   if (!id) return "-";
-
   return id.length > 8 ? id.slice(0, 8) : id;
 };
-
 const getPaymentStatusLabel = (status?: string) => {
   if (status === "cash") return "نقدا";
   if (status === "part") return "جزئي";
   if (status === "debt") return "دين";
   return "غير محدد";
 };
-
 const getPaymentStatusVariant = (status?: string) => {
   if (status === "cash") return "default";
   if (status === "part") return "secondary";
   return "destructive";
 };
-
 const getProductsQuantity = (sale: Sell) => {
   if (Array.isArray(sale.products)) {
     return sale.products.reduce(
@@ -73,13 +57,10 @@ const getProductsQuantity = (sale: Sell) => {
       0,
     );
   }
-
   return toNumber(sale.qty ?? sale.quantity);
 };
-
 const formatTimestamp = (timestamp: number) => {
   if (!timestamp) return "بدون تاريخ";
-
   return new Date(timestamp).toLocaleString("ar-SY", {
     year: "numeric",
     month: "2-digit",
@@ -88,7 +69,6 @@ const formatTimestamp = (timestamp: number) => {
     minute: "2-digit",
   });
 };
-
 export default function TodaySales() {
   const navigate = useNavigate();
   const { data: sells, isLoading: sellsLoading } = useSells();
@@ -98,7 +78,6 @@ export default function TodaySales() {
     staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
   });
-
   const customersMap = useMemo(() => {
     return new Map(
       (customers || []).map((customer: any) => [
@@ -107,54 +86,38 @@ export default function TodaySales() {
       ]),
     );
   }, [customers]);
-
   const todaySales = useMemo(() => {
-    return sortSalesByDateDesc(
-      (sells || []).filter((sale) => isSaleOnDate(sale)),
-    );
+    return sortSalesByDateDesc((sells || []).filter((sale) => isSaleOnDate(sale)));
   }, [sells]);
-
   const summary = useMemo(() => {
-    const totalUSD = todaySales.reduce(
-      (sum, sale) => sum + toNumber(sale.totalUSD ?? sale.totalPrice),
-      0,
-    );
-    const totalSYP = todaySales.reduce(
-      (sum, sale) => sum + toNumber(sale.totalSYP),
+    const totalAmount = todaySales.reduce(
+      (sum, sale) => sum + toNumber(sale.totalPrice),
       0,
     );
     const pendingInvoices = todaySales.filter(
       (sale) => sale.paymentStatus === "part" || sale.paymentStatus === "debt",
     ).length;
-    const lastSaleTimestamp = todaySales[0]
-      ? getSaleTimestamp(todaySales[0])
-      : 0;
-
+    const lastSaleTimestamp = todaySales[0] ? getSaleTimestamp(todaySales[0]) : 0;
     return {
-      totalUSD,
-      totalSYP,
+      totalPrice: totalAmount,
       pendingInvoices,
       lastSaleTimestamp,
     };
   }, [todaySales]);
-
   const isLoading = sellsLoading || customersLoading;
-
-  const getCustomerName = (sale: Sell) => String(
-    sale.customerName ||
-    sale.customer?.name ||
-    customersMap.get(String(sale.customerId || "")) ||
-    "غير محدد",
-  );
-
+  const getCustomerName = (sale: Sell) =>
+    String(
+      sale.customerName ||
+        sale.customer?.name ||
+        customersMap.get(String(sale.customerId || "")) ||
+        "غير محدد",
+    );
   const openSaleDetails = (sale: Sell) => {
     const id = getSaleId(sale);
-
     if (id) {
       navigate("/sellDetails", { state: id });
     }
   };
-
   const summaryCards = [
     {
       title: "عدد فواتير اليوم",
@@ -165,7 +128,7 @@ export default function TodaySales() {
     },
     {
       title: "إجمالي مبيعات اليوم",
-      value: formatDualCurrency(summary.totalUSD, summary.totalSYP),
+      value: formatLira(summary.totalPrice),
       description: "محسوب من إجمالي الفواتير",
       icon: WalletCards,
       color: "border-sky-100 bg-sky-50 text-sky-700",
@@ -185,7 +148,6 @@ export default function TodaySales() {
       color: "border-slate-200 bg-slate-50 text-slate-700",
     },
   ];
-
   return (
     <DashboardLayout>
       <div
@@ -233,7 +195,6 @@ export default function TodaySales() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {summaryCards.map((card) => {
             const Icon = card.icon;
-
             return (
               <div
                 key={card.title}
@@ -241,9 +202,7 @@ export default function TodaySales() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-500">
-                      {card.title}
-                    </p>
+                    <p className="text-sm font-medium text-slate-500">{card.title}</p>
                     {isLoading ? (
                       <Skeleton className="mt-3 h-7 w-28 rounded-lg" />
                     ) : (
@@ -269,9 +228,7 @@ export default function TodaySales() {
         <div className="mt-6 rounded-3xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl sm:p-5">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-black text-slate-800">
-                تفاصيل مبيعات اليوم
-              </h2>
+              <h2 className="text-xl font-black text-slate-800">تفاصيل مبيعات اليوم</h2>
               <p className="mt-1 text-sm text-slate-500">
                 اضغط على أي فاتورة لفتح التفاصيل.
               </p>
@@ -323,9 +280,7 @@ export default function TodaySales() {
                         </div>
                       </div>
 
-                      <Badge
-                        variant={getPaymentStatusVariant(sale.paymentStatus)}
-                      >
+                      <Badge variant={getPaymentStatusVariant(sale.paymentStatus)}>
                         {getPaymentStatusLabel(sale.paymentStatus)}
                       </Badge>
                     </div>
@@ -334,10 +289,7 @@ export default function TodaySales() {
                       <div className="flex items-center justify-between gap-3 border-t pt-2">
                         <span className="text-slate-400">الإجمالي</span>
                         <span className="font-bold text-slate-700">
-                          {formatDualCurrency(
-                            toNumber(sale.totalUSD ?? sale.totalPrice),
-                            toNumber(sale.totalSYP),
-                          )}
+                          {formatLira(toNumber(sale.totalPrice))}
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-3 border-t pt-2">
@@ -382,20 +334,13 @@ export default function TodaySales() {
                         </TableCell>
                         <TableCell>{getCustomerName(sale)}</TableCell>
                         <TableCell className="font-semibold">
-                          {formatDualCurrency(
-                            toNumber(sale.totalUSD ?? sale.totalPrice),
-                            toNumber(sale.totalSYP),
-                          )}
+                          {formatLira(toNumber(sale.totalPrice))}
                         </TableCell>
                         <TableCell>
                           {getProductsQuantity(sale).toLocaleString()}
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant={getPaymentStatusVariant(
-                              sale.paymentStatus,
-                            )}
-                          >
+                          <Badge variant={getPaymentStatusVariant(sale.paymentStatus)}>
                             {getPaymentStatusLabel(sale.paymentStatus)}
                           </Badge>
                         </TableCell>

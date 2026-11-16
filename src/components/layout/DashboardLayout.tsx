@@ -26,10 +26,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           className="hidden md:flex"
         />
         <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-          <SheetContent
-            side="right"
-            className="w-[84vw] max-w-80 p-0 sm:max-w-80"
-          >
+          <SheetContent side="right" className="w-[84vw] max-w-80 p-0 sm:max-w-80">
             <Sidebar
               isCollapsed={false}
               onToggle={() => setMobileSidebarOpen(false)}
@@ -40,13 +37,21 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </Sheet>
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <Header onToggleSidebar={() => setMobileSidebarOpen(true)} />
+          <p dir="rtl" className="px-4 pt-2 text-xs text-muted-foreground">
+            جميع المبالغ بالليرة السورية (ل.س)
+          </p>
           <main
             className={cn(
               "min-w-0 flex-1 overflow-auto p-3 sm:p-4 md:p-6 lg:p-8",
               "transition-all duration-300",
             )}
           >
-            <div dir="rtl" className="mx-auto w-full min-w-0 max-w-7xl space-y-4 md:space-y-6">{children}</div>
+            <div
+              dir="rtl"
+              className="mx-auto w-full min-w-0 max-w-7xl space-y-4 md:space-y-6"
+            >
+              {children}
+            </div>
           </main>
         </div>
       </div>

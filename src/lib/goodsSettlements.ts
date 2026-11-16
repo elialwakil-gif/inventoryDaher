@@ -1,6 +1,5 @@
 import type { Payment } from "@/services/payments";
-import { originalToUSD, roundMoney, toMoneyNumber } from "./money";
-
+import { roundMoney, toMoneyNumber } from "./money";
 export const goodsBalanceLabel = (
   balance: number,
   partyType: "customer" | "supplier",
@@ -9,98 +8,69 @@ export const goodsBalanceLabel = (
   if (partyType === "customer") return balance > 0 ? "له علينا" : "عليه لنا";
   return balance > 0 ? "علينا للمورد" : "لنا عند المورد";
 };
-
 export const goodsSettlementPreview = ({
   items,
   direction,
-  currency,
-  exchangeRate,
-  balanceUSD,
-  balanceSYP,
-  balanceRateSYP,
+  currency: _currency,
+  balance: balanceAmount,
 }: {
-  items: Array<{ quantity: number; settlementPrice: number; payPrice: number }>;
+  items: Array<{
+    quantity: number;
+    settlementPrice: number;
+    payPrice: number;
+  }>;
   direction: "receive" | "deliver";
-  currency: "USD" | "SYP";
-  exchangeRate: number;
-  balanceUSD: number;
-  balanceSYP: number;
-  balanceRateSYP?: number;
+  currency: "SYP";
+  balance: number;
 }) => {
-  const validRate =
-    currency === "USD" || (Number.isFinite(exchangeRate) && exchangeRate > 0);
   const totalOriginal = roundMoney(
+    items.reduce(
+      (sum, item) =>
+        sum + roundMoney(roundMoney(item.quantity) * roundMoney(item.settlementPrice)),
+      0,
+    ),
+  );
+  const totalAmount = roundMoney(
     items.reduce(
       (sum, item) =>
         sum +
         roundMoney(
-          roundMoney(item.quantity) * roundMoney(item.settlementPrice),
+          roundMoney(roundMoney(item.quantity) * roundMoney(item.settlementPrice)),
         ),
       0,
     ),
   );
-  const totalUSD = validRate
-    ? roundMoney(
-        items.reduce(
-          (sum, item) =>
-            sum +
-            originalToUSD(
-              roundMoney(
-                roundMoney(item.quantity) * roundMoney(item.settlementPrice),
-              ),
-              currency,
-              exchangeRate,
-            ),
-          0,
-        ),
-      )
-    : 0;
-  const costUSD =
+  const costAmount =
     direction === "receive"
-      ? totalUSD
+      ? totalAmount
       : roundMoney(
           items.reduce(
-            (sum, item) =>
-              sum + roundMoney(roundMoney(item.quantity) * item.payPrice),
+            (sum, item) => sum + roundMoney(roundMoney(item.quantity) * item.payPrice),
             0,
           ),
         );
-  const differenceUSD = roundMoney(totalUSD - costUSD);
+  const differenceAmount = roundMoney(totalAmount - costAmount);
   const sign = direction === "receive" ? 1 : -1;
-  const nextUSD = roundMoney(balanceUSD + sign * totalUSD);
-  const sypChange = !validRate
-    ? 0
-    : balanceRateSYP !== undefined
-      ? roundMoney(totalUSD * balanceRateSYP)
-      : currency === "SYP"
-        ? totalOriginal
-        : 0;
-  const nextSYP = roundMoney(balanceSYP + sign * sypChange);
+  const nextAmount = roundMoney(balanceAmount + sign * totalAmount);
+  const nextSYP = nextAmount;
   return {
-    totalOriginal,
-    totalUSD,
-    costUSD,
-    differenceUSD,
-    nextUSD,
+    totalPrice: totalOriginal,
+    costAmount,
+    differenceAmount,
+    nextAmount,
     nextSYP,
-    validRate,
   };
 };
-
 export const goodsPaymentLabel = (
   payment: Pick<Payment, "goodsDirection" | "reversalOf" | "status">,
 ) =>
   `${payment.reversalOf ? "سند عكس تسوية" : "تسوية بالبضاعة"} · ${payment.goodsDirection === "receive" ? "استلام" : "تسليم"}${payment.status === "reversed" ? " · ملغاة بسند عكسي" : ""}`;
-
 export const goodsPaymentDetails = (
-  payment: Pick<
-    Payment,
-    "goodsItems" | "warehouse" | "currency" | "paymentCurrency"
-  >,
+  payment: Pick<Payment, "goodsItems" | "warehouse" | "currency" | "currency">,
 ) =>
   (payment.goodsItems || [])
     .map(
       (item) =>
-        `${item.name || item.code} (${toMoneyNumber(item.quantity)} × ${toMoneyNumber(item.settlementPrice)} ${payment.paymentCurrency || payment.currency})`,
+        `${item.name || item.code} (${toMoneyNumber(item.quantity)} × ${toMoneyNumber(item.settlementPrice)} ${payment.currency})`,
     )
     .join("، ") + (payment.warehouse ? ` · ${payment.warehouse}` : "");

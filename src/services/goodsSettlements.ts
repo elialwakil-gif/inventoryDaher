@@ -1,6 +1,5 @@
 import apiClient from "@/lib/axios";
 import type { Payment } from "./payments";
-
 export interface GoodsSettlementInput {
   requestId: string;
   partyType: "customer" | "supplier";
@@ -13,8 +12,7 @@ export interface GoodsSettlementInput {
     quantity: number;
     settlementPrice: number;
   }>;
-  currency: "USD" | "SYP";
-  exchangeRate: number;
+  currency: "SYP";
   note: string;
   sellId?: string;
   purchaseId?: string;
@@ -22,18 +20,20 @@ export interface GoodsSettlementInput {
   inventoryAccountId: string;
   differenceAccountId?: string;
 }
-
 const serverError = (error: any, fallback: string) => {
   const result = new Error(
     error?.response?.data?.message || error?.response?.data?.error || fallback,
-  ) as Error & { outcomeUncertain: boolean };
+  ) as Error & {
+    outcomeUncertain: boolean;
+  };
   result.outcomeUncertain = !error?.response || error.response.status >= 500;
   return result;
 };
-
 export async function createGoodsSettlement(
   paymentData: GoodsSettlementInput,
-): Promise<{ payment: Payment }> {
+): Promise<{
+  payment: Payment;
+}> {
   try {
     const response = await apiClient.post("/api/transactions/goodsPayment", {
       paymentData,
@@ -46,7 +46,6 @@ export async function createGoodsSettlement(
     );
   }
 }
-
 export async function reverseGoodsSettlement({
   id,
   requestId,
@@ -66,5 +65,4 @@ export async function reverseGoodsSettlement({
     throw serverError(error, "تعذر إلغاء التسوية بالبضاعة");
   }
 }
-
 export const newSettlementRequestId = () => crypto.randomUUID();

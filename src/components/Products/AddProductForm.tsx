@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import PopupForm from "../ui/custom/PopupForm";
 import { Button } from "../ui/button";
 import FormInput from "../ui/custom/FormInput";
@@ -22,9 +22,7 @@ import { toast } from "sonner";
 import { queryKeys } from "@/lib/queryKeys";
 import { useProductsGrouping } from "@/hooks/useProductsGrouping";
 import { buildInvoiceMoney } from "@/lib/money";
-
 type FormValues = z.infer<typeof addProductSchema>;
-
 export default function AddProductForm({
   isOpen,
   setIsOpen,
@@ -40,11 +38,13 @@ export default function AddProductForm({
     id: c,
     name: c,
   }));
-
   const queryClient = useQueryClient();
+  const pendingRequest = useRef<{
+    fingerprint: string;
+    id: string;
+  } | null>(null);
   const [openSupplier, setOpenSupplier] = React.useState(false);
   const [isCustomCategory, setIsCustomCategory] = React.useState(false);
-
   const {
     register,
     handleSubmit,
@@ -57,21 +57,16 @@ export default function AddProductForm({
     resolver: zodResolver(addProductSchema),
     defaultValues: {
       isDebt: "cash",
-      currency: "USD",
-      exchangeRate: 1,
+      currency: "SYP",
       inventoryAccountId: "",
       payableAccountId: "",
       paymentAccountId: "",
       alertQuantity: 5,
     },
   });
-
   const isDebt = watch("isDebt");
-  const currency = watch("currency");
-
   useEffect(() => {
-    if (!row) return;
-
+    if (!isOpen || !row) return;
     reset({
       name: row.name,
       code: row.code,
@@ -79,25 +74,24 @@ export default function AddProductForm({
       warehouse: row.warehouse,
       payPrice: row.payPrice,
       wholesalePrice: row.wholesalePrice ?? row.sellPrice,
-      superWholesalePrice: row.superWholesalePrice ?? row.wholesalePrice ?? row.sellPrice,
+      superWholesalePrice:
+        row.superWholesalePrice ?? row.wholesalePrice ?? row.sellPrice,
       sellPrice: row.sellPrice,
       unit: row.unit,
-      quantity: row.quantity ?? 1,
+      quantity: 1,
       alertQuantity: row.alertQuantity ?? row.lowStockLimit ?? row.minQuantity ?? 5,
       supplierId: row.supplierId ?? "",
       isDebt: "cash",
-      currency: "USD",
-      exchangeRate: 1,
+      currency: "SYP",
       inventoryAccountId: row.inventoryAccountId ?? "",
       payableAccountId: row.payableAccountId ?? "",
       paymentAccountId: row.paymentAccountId ?? "",
     });
-  }, [row, reset]);
-
+  }, [isOpen, row, reset]);
   const mutation = useMutation({
-    mutationFn: (data: { newProduct: any; newPurchase: any }) =>
-      payNewProduct(data),
+    mutationFn: (data: { newProduct: any; newPurchase: any }) => payNewProduct(data),
     onSuccess: () => {
+      pendingRequest.current = null;
       reset();
       setIsOpen(false);
       queryClient.invalidateQueries({
@@ -120,48 +114,43 @@ export default function AddProductForm({
       toast.error(error?.message || "فشل في إضافة المنتج");
     },
   });
-
   const onSubmit = (values: FormValues) => {
+    const fingerprint = JSON.stringify(values);
+    if (pendingRequest.current?.fingerprint !== fingerprint) {
+      pendingRequest.current = { fingerprint, id: crypto.randomUUID() };
+    }
     const total = values.quantity * values.payPrice;
-
     if (!values.currency) {
       toast.error("الرجاء اختيار العملة");
       return;
     }
-
     if (values.isDebt === "part" && (values.partValue ?? 0) <= 0) {
       toast.error("الرجاء إدخال قيمة الدفعة الجزئية");
       return;
     }
 
-    if (
-      values.currency === "SYP" &&
-      values.exchangeRate <= 0
-    ) {
-      toast.error("الرجاء إدخال سعر صرف صحيح");
-      return;
-    }
-
     const purchaseMoney = buildInvoiceMoney({
-      totalUSD: total,
+      totalPrice: total,
       paymentStatus: values.isDebt,
       currency: values.currency,
-      exchangeRate: values.exchangeRate,
       partValue: values.partValue,
     });
-
-    if (values.isDebt === "part" && purchaseMoney.paidUSD >= total) {
-      toast.error("قيمة الدفعة الجزئية لا يمكن أن تكون أكبر أو تساوي المبلغ الكلي");
+    if (
+      values.isDebt === "part" &&
+      (purchaseMoney.paidAmount <= 0 || purchaseMoney.paidAmount >= total)
+    ) {
+      toast.error(
+        "قيمة الدفعة الجزئية يجب أن تكون أكبر من صفر وأقل من المبلغ الكلي بعد التحويل",
+      );
       return;
     }
-
     if (values.isDebt !== "debt" && !values.paymentAccountId) {
       toast.error("الرجاء اختيار حساب الدفع");
       return;
     }
-
     mutation.mutate({
       newProduct: {
+        id: row?.id,
         name: values.name,
         code: values.code,
         category: values.category,
@@ -175,6 +164,7 @@ export default function AddProductForm({
         alertQuantity: values.alertQuantity,
       },
       newPurchase: {
+        requestId: pendingRequest.current.id,
         supplierId: values.supplierId,
         name: values.name,
         code: values.code,
@@ -183,24 +173,14 @@ export default function AddProductForm({
         payPrice: values.payPrice,
         wholesalePrice: values.wholesalePrice,
         superWholesalePrice: values.superWholesalePrice,
-        currency: purchaseMoney.paymentCurrency,
-        paymentCurrency: purchaseMoney.paymentCurrency,
-        priceCurrency: purchaseMoney.priceCurrency,
-        exchangeRate: purchaseMoney.exchangeRate,
-        amount_base: purchaseMoney.totalOriginal,
-        totalPrice: purchaseMoney.totalUSD,
-        totalUSD: purchaseMoney.totalUSD,
-        totalSYP: purchaseMoney.totalSYP,
-        totalOriginal: purchaseMoney.totalOriginal,
-        paidUSD: purchaseMoney.paidUSD,
-        paidSYP: purchaseMoney.paidSYP,
-        paidOriginal: purchaseMoney.paidOriginal,
+        currency: purchaseMoney.currency,
+        amount: purchaseMoney.totalPrice,
+        totalPrice: purchaseMoney.totalPrice,
+        paidAmount: purchaseMoney.paidAmount,
         paymentStatus: values.isDebt,
-        remainingDebt: purchaseMoney.remainingUSD,
-        remainingUSD: purchaseMoney.remainingUSD,
-        remainingSYP: purchaseMoney.remainingSYP,
-        remainingOriginal: purchaseMoney.remainingOriginal,
-        partValue: purchaseMoney.paidOriginal,
+        remainingDebt: purchaseMoney.remainingDebt,
+        partValue:
+          values.isDebt === "part" ? values.partValue : purchaseMoney.paidAmount,
         inventoryAccountId: values.inventoryAccountId,
         payableAccountId: values.payableAccountId,
         paymentAccountId:
@@ -208,11 +188,10 @@ export default function AddProductForm({
       },
     });
   };
-
   return (
     <PopupForm
       trigger={<></>}
-      title={row ? "تعديل المنتج" : "شراء منتجات"}
+      title={row ? "شراء المنتج" : "شراء منتجات"}
       isOpen={isOpen}
       setIsOpen={setIsOpen}
     >
@@ -272,9 +251,7 @@ export default function AddProductForm({
               )}
 
               {errors.category?.message && (
-                <p className="text-red-600 text-sm mt-1">
-                  {errors.category.message}
-                </p>
+                <p className="text-red-600 text-sm mt-1">{errors.category.message}</p>
               )}
             </div>
           )}
@@ -287,34 +264,32 @@ export default function AddProductForm({
             <div>
               <WarehouseSelect value={field.value} onChange={field.onChange} />
               {errors.warehouse?.message && (
-                <p className="text-red-600 text-sm mt-1">
-                  {errors.warehouse.message}
-                </p>
+                <p className="text-red-600 text-sm mt-1">{errors.warehouse.message}</p>
               )}
             </div>
           )}
         />
 
         <FormInput
-          label="سعر الشراء"
+          label="سعر الشراء (ل.س)"
           type="number"
           {...register("payPrice")}
           error={errors.payPrice?.message}
         />
         <FormInput
-          label="سعر الجملة"
+          label="سعر الجملة (ل.س)"
           type="number"
           {...register("wholesalePrice")}
           error={errors.wholesalePrice?.message}
         />
         <FormInput
-          label="سعر جملة الجملة"
+          label="سعر جملة الجملة (ل.س)"
           type="number"
           {...register("superWholesalePrice")}
           error={errors.superWholesalePrice?.message}
         />
         <FormInput
-          label="سعر المبيع"
+          label="سعر المبيع (ل.س)"
           type="number"
           {...register("sellPrice")}
           error={errors.sellPrice?.message}
@@ -332,11 +307,7 @@ export default function AddProductForm({
           {...register("alertQuantity")}
           error={errors.alertQuantity?.message}
         />
-        <FormInput
-          label="الواحدة"
-          {...register("unit")}
-          error={errors.unit?.message}
-        />
+        <FormInput label="الواحدة" {...register("unit")} error={errors.unit?.message} />
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:col-span-2">
           {(["cash", "part", "debt"] as const).map((v) => (
@@ -361,38 +332,7 @@ export default function AddProductForm({
         )}
 
         <>
-          <>
-            <Controller
-              control={control}
-              name="currency"
-              render={({ field }) => (
-                <div>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className="mt-6">
-                      <SelectValue placeholder="العملة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="SYP">SYP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.currency?.message && (
-                    <p className="text-red-600 text-sm mt-1">
-                      {errors.currency.message}
-                    </p>
-                  )}
-                </div>
-              )}
-            />
-
-            <FormInput
-              label="سعر الصرف"
-              type="number"
-              disabled={currency === "USD"}
-              {...register("exchangeRate")}
-              error={errors.exchangeRate?.message}
-            />
-          </>
+          <></>
         </>
 
         <Controller
@@ -453,9 +393,7 @@ export default function AddProductForm({
                 withDataTable
               />
               {errors.supplierId?.message && (
-                <p className="text-red-600 text-sm mt-1">
-                  {errors.supplierId.message}
-                </p>
+                <p className="text-red-600 text-sm mt-1">{errors.supplierId.message}</p>
               )}
             </div>
           )}
@@ -467,7 +405,7 @@ export default function AddProductForm({
           disabled={mutation.isPending}
           loading={mutation.isPending}
         >
-          {row ? "تعديل" : "إضافة"}
+          تأكيد الشراء
         </Button>
       </form>
     </PopupForm>

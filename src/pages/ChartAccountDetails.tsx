@@ -6,24 +6,18 @@ import Loading from "@/components/ui/custom/Loading";
 import { useGetAccountDetails } from "@/hooks/useAccount";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-
 const accountColumns = [
   { key: "name", label: "الحقل" },
   { key: "value", label: "القيمة" },
 ];
-
 const paymentsColumns = [
   { key: "id", label: "المعرف", hidden: true },
   { key: "amount", label: "المبلغ", sortable: true },
-  { key: "amountUSD", label: "USD", sortable: true },
-  { key: "amountSYP", label: "SYP", sortable: true },
-  { key: "amountOriginal", label: "المبلغ الأصلي", sortable: true },
   { key: "currency", label: "العملة", sortable: true },
   { key: "date", label: "التاريخ", sortable: true },
   { key: "note", label: "الملاحظات", sortable: true },
   { key: "type", label: "النوع", sortable: true },
 ];
-
 const purchasesColumns = [
   { key: "id", label: "المعرف", hidden: true },
   { key: "name", label: "المادة", sortable: true },
@@ -33,7 +27,6 @@ const purchasesColumns = [
   { key: "paymentStatus", label: "حالة الدفع", sortable: true },
   { key: "date", label: "التاريخ", sortable: true },
 ];
-
 const sellsColumns = [
   { key: "id", label: "المعرف", hidden: true },
   { key: "customerId", label: "الزبون", sortable: true },
@@ -43,21 +36,18 @@ const sellsColumns = [
   { key: "currency", label: "العملة", sortable: true },
   { key: "date", label: "التاريخ", sortable: true },
 ];
-
 const customersColumns = [
   { key: "id", label: "المعرف", hidden: true },
   { key: "name", label: "الاسم", sortable: true },
   { key: "phone", label: "الهاتف", sortable: true },
   { key: "address", label: "العنوان", sortable: true },
 ];
-
 const suppliersColumns = [
   { key: "id", label: "المعرف", hidden: true },
   { key: "name", label: "الاسم", sortable: true },
   { key: "phone", label: "الهاتف", sortable: true },
   { key: "address", label: "العنوان", sortable: true },
 ];
-
 const labelMap: Record<string, string> = {
   id: "المعرف",
   name: "الاسم",
@@ -66,43 +56,33 @@ const labelMap: Record<string, string> = {
   category: "الفئة",
   openingBalance: "الرصيد الافتتاحي",
   currentBalance: "الرصيد الحالي",
-  openingBalanceUSD: "الرصيد الافتتاحي USD",
-  openingBalanceSYP: "الرصيد الافتتاحي SYP",
-  currentBalanceUSD: "الرصيد الحالي USD",
-  currentBalanceSYP: "الرصيد الحالي SYP",
   currency: "العملة",
   description: "الوصف",
   createdAt: "تاريخ الإنشاء",
   updatedAt: "آخر تحديث",
 };
-
 function formatValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "-";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
-
 export default function ChartAccountDetails() {
   const navigate = useNavigate();
   const { id = "" } = useParams();
   const { data, isLoading, error } = useGetAccountDetails(id);
-
   const account = data?.account ?? data?.data?.account ?? null;
   const relatedData = data?.relatedData ?? data?.data?.relatedData ?? {};
-
   const accountInfo = account
     ? Object.entries(account).map(([key, value]) => ({
         name: labelMap[key] || key,
         value: formatValue(value),
       }))
     : [];
-
   const payments = Array.isArray(relatedData.payments) ? relatedData.payments : [];
   const purchases = Array.isArray(relatedData.purchases) ? relatedData.purchases : [];
   const sells = Array.isArray(relatedData.sells) ? relatedData.sells : [];
   const customers = Array.isArray(relatedData.customers) ? relatedData.customers : [];
   const suppliers = Array.isArray(relatedData.suppliers) ? relatedData.suppliers : [];
-
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -110,7 +90,6 @@ export default function ChartAccountDetails() {
       </DashboardLayout>
     );
   }
-
   if (error || !account) {
     return (
       <DashboardLayout>
@@ -129,7 +108,6 @@ export default function ChartAccountDetails() {
       </DashboardLayout>
     );
   }
-
   return (
     <DashboardLayout>
       <div className="space-y-6" dir="rtl">

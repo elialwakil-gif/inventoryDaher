@@ -28,6 +28,7 @@ interface TableColumn {
   sortable?: boolean;
   hidden?: boolean;
   onlyAdmin?: boolean;
+  wrap?: boolean;
 }
 
 interface TableData {
@@ -43,6 +44,8 @@ interface DataTableProps {
   className?: string;
   pageSizeOptions?: number[];
   defaultPageSize?: number;
+  constrainLargePages?: boolean;
+  showResultCount?: boolean;
   getRowClassName?: (row: TableData) => string;
   renderRowActions?: (row: TableData) => React.ReactNode;
   amountBold?: boolean;
@@ -61,6 +64,8 @@ export function DataTable({
   className,
   pageSizeOptions = [5, 10, 20],
   defaultPageSize = 10,
+  constrainLargePages = false,
+  showResultCount = false,
   getRowClassName,
   renderRowActions,
   amountBold = false,
@@ -107,10 +112,20 @@ export function DataTable({
   });
 
   const totalPages = Math.ceil(sortedData.length / pageSize);
+  const lastPage = Math.max(totalPages, 1);
+  const visiblePage = Math.min(currentPage, lastPage);
   const paginatedData = sortedData.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
+    (visiblePage - 1) * pageSize,
+    visiblePage * pageSize,
   );
+  const firstVisibleRow =
+    sortedData.length === 0 ? 0 : (visiblePage - 1) * pageSize + 1;
+  const lastVisibleRow = Math.min(visiblePage * pageSize, sortedData.length);
+  const scrollLargePage = constrainLargePages && pageSize >= 50;
+
+  useEffect(() => {
+    if (currentPage > lastPage) setCurrentPage(lastPage);
+  }, [currentPage, lastPage]);
 
   const handleSort = (key: string) => {
     let direction: "asc" | "desc" = "asc";
@@ -298,7 +313,10 @@ export function DataTable({
                     </div>
                     {renderRowActions && (
                       <div
-                        className="flex shrink-0 flex-wrap justify-end gap-1"
+                        className={cn(
+                          "flex shrink-0 flex-wrap justify-end gap-1",
+                          constrainLargePages && "max-w-[65%]",
+                        )}
                         onClick={(event) => event.stopPropagation()}
                       >
                         {renderRowActions(row)}
@@ -333,18 +351,28 @@ export function DataTable({
           )}
         </div>
 
-        <div className="hidden w-full overflow-x-auto rounded-md border md:block">
-          <Table className="min-w-[720px] text-center">
+        <div
+          className={cn(
+            "hidden w-full rounded-md border md:block",
+            scrollLargePage ? "overflow-hidden" : "overflow-x-auto",
+          )}
+        >
+          <Table
+            className="min-w-[720px] text-center"
+            containerClassName={scrollLargePage ? "max-h-[70vh] overflow-auto" : undefined}
+          >
             <TableHeader>
               <TableRow>
                 {columns.map((column) => (
                   <TableHead
-                    className={
+                    className={cn(
                       column.hidden ||
-                      (column.onlyAdmin && inventoryUser?.role !== "admin")
+                        (column.onlyAdmin && inventoryUser?.role !== "admin")
                         ? "hidden"
-                        : "whitespace-nowrap text-center"
-                    }
+                        : "whitespace-nowrap text-center",
+                      column.wrap && "min-w-56",
+                      scrollLargePage && "sticky top-0 z-10 bg-background",
+                    )}
                     key={column.key}
                   >
                     {column.sortable ? (
@@ -369,7 +397,12 @@ export function DataTable({
                   </TableHead>
                 ))}
                 {renderRowActions && (
-                  <TableHead className="whitespace-nowrap text-center">
+                  <TableHead
+                    className={cn(
+                      "whitespace-nowrap text-center",
+                      scrollLargePage && "sticky top-0 z-10 bg-background",
+                    )}
+                  >
                     Actions
                   </TableHead>
                 )}
@@ -413,7 +446,9 @@ export function DataTable({
                           column.hidden ||
                           (column.onlyAdmin && inventoryUser?.role !== "admin")
                             ? "hidden"
-                            : "max-w-48 truncate whitespace-nowrap"
+                            : column.wrap
+                              ? "min-w-56 max-w-72 whitespace-normal break-words"
+                              : "max-w-48 truncate whitespace-nowrap"
                         }
                         key={column.key}
                         title={
@@ -448,10 +483,11 @@ export function DataTable({
         
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center justify-between gap-2 md:justify-start">
+          <div className="flex flex-wrap items-center justify-between gap-2 md:justify-start">
             <span className="text-sm text-muted-foreground">عدد الاسطر :</span>
             <select
               className="h-9 rounded border bg-background px-2 py-1 text-sm"
+              aria-label="عدد الأسطر في الصفحة"
               value={pageSize}
               onChange={(e) => {
                 setPageSize(Number(e.target.value));
@@ -464,6 +500,11 @@ export function DataTable({
                 </option>
               ))}
             </select>
+            {showResultCount && (
+              <span className="text-sm text-muted-foreground" role="status">
+                عرض {firstVisibleRow}–{lastVisibleRow} من {sortedData.length}
+              </span>
+            )}
           </div>
           <div className="flex items-center justify-between gap-2 md:justify-end">
             <Button
@@ -471,21 +512,23 @@ export function DataTable({
               size="sm"
               className="h-9 min-w-10"
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
+              disabled={visiblePage === 1}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
             <span className="min-w-28 text-center text-sm">
-              Page {currentPage} of {totalPages || 1}
+              {showResultCount
+                ? `الصفحة ${visiblePage} من ${lastPage}`
+                : `Page ${visiblePage} of ${lastPage}`}
             </span>
             <Button
               variant="outline"
               size="sm"
               className="h-9 min-w-10"
               onClick={() =>
-                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                setCurrentPage((prev) => Math.min(prev + 1, lastPage))
               }
-              disabled={currentPage === totalPages || totalPages === 0}
+              disabled={visiblePage === lastPage || totalPages === 0}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>

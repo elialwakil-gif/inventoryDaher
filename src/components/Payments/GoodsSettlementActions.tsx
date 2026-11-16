@@ -23,7 +23,6 @@ import {
   reverseGoodsSettlement,
 } from "@/services/goodsSettlements";
 import { refreshGoodsSettlementQueries } from "./GoodsSettlementForm";
-
 export default function GoodsSettlementActions({
   payment,
   partyName,
@@ -35,13 +34,15 @@ export default function GoodsSettlementActions({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [note, setNote] = useState("");
   const [outcomeUncertain, setOutcomeUncertain] = useState(false);
-  const submitted = useRef<{ requestId: string; note: string }>();
+  const submitted = useRef<{
+    requestId: string;
+    note: string;
+  }>();
   const queryClient = useQueryClient();
   const isAdmin = useMemo(() => {
     try {
       return (
-        JSON.parse(localStorage.getItem("InventoryUser") || "null")?.role ===
-        "admin"
+        JSON.parse(localStorage.getItem("InventoryUser") || "null")?.role === "admin"
       );
     } catch {
       return false;
@@ -59,7 +60,13 @@ export default function GoodsSettlementActions({
       refreshGoodsSettlementQueries(queryClient);
     },
     onError: (error) => {
-      if (!(error as Error & { outcomeUncertain?: boolean }).outcomeUncertain) {
+      if (
+        !(
+          error as Error & {
+            outcomeUncertain?: boolean;
+          }
+        ).outcomeUncertain
+      ) {
         submitted.current = undefined;
         setOutcomeUncertain(false);
       }
@@ -67,7 +74,7 @@ export default function GoodsSettlementActions({
     },
   });
   if (payment.settlementMethod !== "goods") return null;
-  const currency = payment.paymentCurrency || payment.currency;
+  const currency = payment.currency;
   const canReverse =
     isAdmin &&
     payment.id &&
@@ -106,9 +113,7 @@ export default function GoodsSettlementActions({
           {payment.date ? new Date(payment.date).toLocaleString("ar-SY") : "-"}
         </p>
         {(payment.sellId || payment.purchaseId) && (
-          <p className="text-sm">
-            الفاتورة: {payment.sellId || payment.purchaseId}
-          </p>
+          <p className="text-sm">الفاتورة: {payment.sellId || payment.purchaseId}</p>
         )}
         {payment.reversalOf && (
           <p className="text-sm">سند عكس للعملية: {payment.reversalOf}</p>
@@ -138,12 +143,8 @@ export default function GoodsSettlementActions({
                   <td className="p-2">
                     {item.quantity} {item.unit || ""}
                   </td>
-                  <td className="p-2">
-                    {formatMoney(item.settlementPrice, currency)}
-                  </td>
-                  <td className="p-2">
-                    {formatMoney(item.lineTotalOriginal, currency)}
-                  </td>
+                  <td className="p-2">{formatMoney(item.settlementPrice, currency)}</td>
+                  <td className="p-2">{formatMoney(item.lineTotalAmount, currency)}</td>
                   <td className="p-2">
                     {item.quantityBefore} ← {item.quantityAfter}
                   </td>
@@ -153,24 +154,11 @@ export default function GoodsSettlementActions({
           </table>
         </div>
         <p className="font-bold">
-          قيمة التسوية:{" "}
-          {formatMoney(
-            Math.abs(payment.amountOriginal ?? payment.amount_base),
-            currency,
-          )}{" "}
-          / {formatMoney(Math.abs(payment.amountUSD ?? payment.amount), "USD")}
+          قيمة التسوية: {formatMoney(Math.abs(payment.amount), currency)}{" "}
         </p>
-        {currency === "SYP" && (
-          <p className="text-sm">
-            سعر الصرف: {payment.exchangeRate} SYP لكل USD
-          </p>
-        )}
+
         <p className="text-sm">
-          أثر الرصيد:{" "}
-          {formatMoney(
-            payment.balanceUSDChange ?? payment.amountUSD ?? payment.amount,
-            "USD",
-          )}
+          أثر الرصيد: {formatMoney(payment.balanceChange ?? payment.amount, "SYP")}
         </p>
         <p className="text-sm">{payment.note || "لا توجد ملاحظات"}</p>
         <PDFDownloadLink
@@ -182,9 +170,7 @@ export default function GoodsSettlementActions({
           fileName={`goods-settlement-${payment.id}.pdf`}
           className="inline-flex min-h-10 items-center justify-center rounded-md border px-4 text-sm font-medium"
         >
-          {({ loading }) =>
-            loading ? "جاري إنشاء السند…" : "تحميل سند البضاعة PDF"
-          }
+          {({ loading }) => (loading ? "جاري إنشاء السند…" : "تحميل سند البضاعة PDF")}
         </PDFDownloadLink>
         {canReverse && !cancelOpen && (
           <Button
@@ -198,9 +184,8 @@ export default function GoodsSettlementActions({
         {canReverse && cancelOpen && (
           <div className="space-y-3 rounded-md border border-destructive p-3">
             <p className="text-sm">
-              يُنشأ سند يعكس حركة البضاعة وأثر الرصيد والفاتورة مع حفظ السند
-              الأصلي. إذا لم تكفِ الكمية المتاحة لعكس استلام البضاعة فسيتوقف
-              الإلغاء.
+              يُنشأ سند يعكس حركة البضاعة وأثر الرصيد والفاتورة مع حفظ السند الأصلي. إذا
+              لم تكفِ الكمية المتاحة لعكس استلام البضاعة فسيتوقف الإلغاء.
             </p>
             <Label htmlFor={`reverse-note-${payment.id}`}>سبب الإلغاء</Label>
             <Textarea

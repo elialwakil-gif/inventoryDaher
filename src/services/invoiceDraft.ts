@@ -1,15 +1,12 @@
 import apiClient from "@/lib/axios";
 import type { Product, ProductPriceType, sell } from "@/services/transaction";
-
 export type InvoicePaymentStatus = "cash" | "part" | "debt";
-
 export type InvoiceDraftProduct = Product & {
   productId?: string;
   qty: number;
   totalPrice?: number;
   selectedPriceType?: ProductPriceType;
 };
-
 export interface InvoiceDraft {
   id?: string;
   userId?: string;
@@ -17,11 +14,9 @@ export interface InvoiceDraft {
   products: InvoiceDraftProduct[];
   discount: string;
   discountPercent?: string;
-  discountAmount?: string;
   paymentStatus: InvoicePaymentStatus;
   partValue: string;
   currency: string;
-  exchangeRate: number;
   paymentAccountId: string;
   receivableAccountId: string;
   salesAccountId: string;
@@ -30,17 +25,13 @@ export interface InvoiceDraft {
   updatedBy?: string;
   clearedAt?: string;
 }
-
 export type InvoiceDraftUpdate = Partial<InvoiceDraft>;
-
 const toNumber = (value: unknown, fallback = 0) => {
   const next = Number(value);
   return Number.isFinite(next) ? next : fallback;
 };
-
 const normalizePriceType = (value: unknown): ProductPriceType => {
   const next = String(value || "custom");
-
   return [
     "payPrice",
     "wholesalePrice",
@@ -51,24 +42,20 @@ const normalizePriceType = (value: unknown): ProductPriceType => {
     ? (next as ProductPriceType)
     : "custom";
 };
-
 export const createEmptyInvoiceDraft = (): InvoiceDraft => ({
   customerId: "",
   products: [],
   discount: "",
   discountPercent: "",
-  discountAmount: "",
   paymentStatus: "cash",
   partValue: "",
-  currency: "USD",
-  exchangeRate: 1,
+  currency: "SYP",
   paymentAccountId: "",
   receivableAccountId: "",
   salesAccountId: "",
   version: 0,
   updatedAt: new Date().toISOString(),
 });
-
 export const normalizeInvoiceDraftProduct = (
   product: Partial<InvoiceDraftProduct> | any,
 ): InvoiceDraftProduct => ({
@@ -86,25 +73,20 @@ export const normalizeInvoiceDraftProduct = (
   quantity: toNumber(product?.quantity),
   reservedQuantity: toNumber(product?.reservedQuantity),
   alertQuantity:
-    product?.alertQuantity === undefined
-      ? undefined
-      : toNumber(product.alertQuantity),
+    product?.alertQuantity === undefined ? undefined : toNumber(product.alertQuantity),
   warehouse: String(product?.warehouse || ""),
   updatedDate: String(product?.updatedDate || ""),
   qty: toNumber(product?.qty, 1),
   totalPrice:
     product?.totalPrice === undefined ? undefined : toNumber(product.totalPrice),
 });
-
 export const normalizeInvoiceDraft = (
   rawDraft?: Partial<InvoiceDraft> | null,
 ): InvoiceDraft => {
   const emptyDraft = createEmptyInvoiceDraft();
-
   if (!rawDraft) {
     return emptyDraft;
   }
-
   return {
     ...emptyDraft,
     ...rawDraft,
@@ -120,21 +102,14 @@ export const normalizeInvoiceDraft = (
       rawDraft.discountPercent === undefined || rawDraft.discountPercent === null
         ? ""
         : String(rawDraft.discountPercent),
-    discountAmount:
-      rawDraft.discountAmount === undefined || rawDraft.discountAmount === null
-        ? ""
-        : String(rawDraft.discountAmount),
-    paymentStatus: ["cash", "part", "debt"].includes(
-      String(rawDraft.paymentStatus),
-    )
+    paymentStatus: ["cash", "part", "debt"].includes(String(rawDraft.paymentStatus))
       ? (rawDraft.paymentStatus as InvoicePaymentStatus)
       : "cash",
     partValue:
       rawDraft.partValue === undefined || rawDraft.partValue === null
         ? ""
         : String(rawDraft.partValue),
-    currency: String(rawDraft.currency || ""),
-    exchangeRate: toNumber(rawDraft.exchangeRate, 1),
+    currency: "SYP",
     paymentAccountId: String(rawDraft.paymentAccountId || ""),
     receivableAccountId: String(rawDraft.receivableAccountId || ""),
     salesAccountId: String(rawDraft.salesAccountId || ""),
@@ -144,27 +119,22 @@ export const normalizeInvoiceDraft = (
     clearedAt: rawDraft.clearedAt ? String(rawDraft.clearedAt) : undefined,
   };
 };
-
 const extractDraft = (responseData: any) =>
   normalizeInvoiceDraft(
     responseData?.draft || responseData?.data || responseData || null,
   );
-
 export async function getMyInvoiceDraft() {
   const response = await apiClient.get("/api/invoice-draft/me");
   return extractDraft(response.data);
 }
-
 export async function updateMyInvoiceDraft(draft: InvoiceDraftUpdate) {
   const response = await apiClient.put("/api/invoice-draft/me", { draft });
   return extractDraft(response.data);
 }
-
 export async function clearMyInvoiceDraft() {
   const response = await apiClient.delete("/api/invoice-draft/me");
   return extractDraft(response.data);
 }
-
 export async function checkoutMyInvoiceDraft(newSell: sell) {
   const response = await apiClient.post("/api/invoice-draft/me/checkout", {
     newSell,
